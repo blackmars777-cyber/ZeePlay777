@@ -1790,6 +1790,9 @@ private class AudioRenderer(
     @Volatile private var started = false
     private var codec: MediaCodec? = null
     private var track: AudioTrack? = null
+    private var softwareOpus: SoftwareOpusDecoder? = null
+    private var decoderImplementation = "none"
+    private val outputHealth = AudioOutputHealth()
     @Volatile private var navigationAttenuationDb = 0
     private var appliedNavigationAttenuationDb: Int? = null
     private var pcm = ByteArray(64 * 1024)
@@ -1854,6 +1857,7 @@ private class AudioRenderer(
     }
 
     fun submit(rtp: ByteArray, sample: Int) {
+        if (!running) return
         val now = System.nanoTime()
         if (started) {
             packetsReceived.incrementAndGet()
@@ -1903,12 +1907,18 @@ private class AudioRenderer(
                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
                 "mapping=${if (advancedAudioChannelMapping) "automotive" else "mobile"} " +
                 "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") }
+            AudioDecoderInventory.report(report)
             when (format.codec) {
                 AudioCodecKind.AAC_LC -> configureCodec(MediaFormat.MIMETYPE_AUDIO_AAC)
-                AudioCodecKind.OPUS -> configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
-                AudioCodecKind.LPCM -> Unit
+                AudioCodecKind.OPUS -> configureOpus()
+                AudioCodecKind.LPCM -> decoderImplementation = "pcm"
+            }
+            if (format.codec != AudioCodecKind.LPCM && codec == null && softwareOpus == null) {
+                report("Audio: unavailable audioType=${format.audioType} codec=${format.codec} reason=no_decoder")
+                return
             }
             createTrack()
+            if (track?.state != AudioTrack.STATE_INITIALIZED) return
             diagnosticStage = "focus"
             requestAudioFocus()
             while (running) {
@@ -1922,6 +1932,10 @@ private class AudioRenderer(
                 codec?.let(::drainCodec)
                 diagnosticStage = "buffer-maintenance"
                 maintainPlaybackBuffer()
+                outputHealth.transition(System.nanoTime())?.let { state ->
+                    runCatching { report("Audio: output health audioType=${format.audioType} codec=${format.codec} " +
+                        "implementation=$decoderImplementation state=$state totalWrittenFrames=$totalWrittenFrames") }
+                }
                 diagnosticStage = "stats"
                 logStatsIfDue()
             }
@@ -1937,8 +1951,34 @@ private class AudioRenderer(
             if (running) reportFailure(error)
             throw error
         } finally {
+            running = false
+            queue.clear()
             runCatching { logStatsIfDue(force = true) }
             release()
+        }
+    }
+
+    private fun configureOpus() {
+        // Car firmware can omit every platform Opus component. The bundled decoder makes
+        // navigation/calls/Siri independent of that registry, without changing negotiation.
+        diagnosticStage = "software-decoder-create"
+        try {
+            softwareOpus = SoftwareOpusDecoder(format.sampleRate, format.channels, onError = { error ->
+                reportFailure(error)
+            })
+        } catch (error: Exception) {
+            reportFailure(error)
+        } catch (error: AssertionError) {
+            reportFailure(error)
+        } catch (error: LinkageError) {
+            reportFailure(error)
+        }
+        if (softwareOpus != null) {
+            decoderImplementation = "software"
+            runCatching { report("Audio: decoder ready audioType=${format.audioType} codec=OPUS " +
+                "implementation=software name=concentus rate=${format.sampleRate} channels=${format.channels}") }
+        } else {
+            configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
         }
     }
 
@@ -1965,24 +2005,41 @@ private class AudioRenderer(
                     "csd0=${aacAudioSpecificConfig().toHexString()}",
             )
         }
-        codec = try {
-            MediaCodecStartup.create(
-                create = { diagnosticStage = "decoder-create"; MediaCodec.createDecoderByType(mime) },
-                configure = { diagnosticStage = "decoder-configure"; it.configure(mediaFormat, null, null, 0) },
-                start = { diagnosticStage = "decoder-start"; it.start() },
-                release = { it.release() },
-            ).also {
-                // A vendor name getter or diagnostic callback must not discard a started codec.
-                runCatching {
-                    val name = it.name
-                    Log.i(TAG, "audio decoder configured mime=$mime name=$name")
-                    report("Audio: decoder ready audioType=${format.audioType} codec=${format.codec} name=$name")
+        val names = AudioDecoderInventory.names(mime)
+        if (names != null && names.isEmpty()) {
+            runCatching { report("Audio: decoder unavailable mime=$mime reason=no_platform_candidate") }
+            return
+        }
+        // A damaged preferred component must not hide another usable decoder. Only fall back
+        // to selection by MIME when enumeration itself failed, rather than a known empty list.
+        val candidates: List<String?> = names ?: listOf(null)
+        for (name in candidates) {
+            codec = try {
+                MediaCodecStartup.create(
+                    create = {
+                        diagnosticStage = "decoder-create"
+                        if (name == null) MediaCodec.createDecoderByType(mime) else MediaCodec.createByCodecName(name)
+                    },
+                    configure = { diagnosticStage = "decoder-configure"; it.configure(mediaFormat, null, null, 0) },
+                    start = { diagnosticStage = "decoder-start"; it.start() },
+                    release = { it.release() },
+                ).also {
+                    decoderImplementation = "platform"
+                    // A vendor name getter or diagnostic callback must not discard a started codec.
+                    runCatching {
+                        val activeName = it.name
+                        Log.i(TAG, "audio decoder configured mime=$mime name=$activeName")
+                        report("Audio: decoder ready audioType=${format.audioType} codec=${format.codec} " +
+                            "implementation=platform name=$activeName")
+                    }
                 }
+            } catch (error: Exception) {
+                Log.e(TAG, "audio decoder configuration failed mime=$mime candidate=$name", error)
+                runCatching { report("Audio: decoder candidate failed mime=$mime name=${name ?: "default"}") }
+                reportFailure(error)
+                null
             }
-        } catch (error: Exception) {
-            Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
-            reportFailure(error)
-            null
+            if (codec != null) return
         }
     }
 
@@ -2046,6 +2103,10 @@ private class AudioRenderer(
             )
         }
         track = built
+        if (built.state != AudioTrack.STATE_INITIALIZED) {
+            report("Audio: unavailable audioType=${format.audioType} codec=${format.codec} reason=track_uninitialized")
+            return
+        }
         if (mappedChannel == AudioChannel.PHONE) {
             val listener = AudioRouting.OnRoutingChangedListener { routing -> checkCallRoute(routing.routedDevice) }
             if (runCatching { built.addOnRoutingChangedListener(listener, Handler(Looper.getMainLooper())) }.isSuccess) {
@@ -2246,6 +2307,7 @@ private class AudioRenderer(
             .array()
 
     private fun handle(packet: AudioPacket) {
+        outputHealth.input(System.nanoTime())
         if (queue.isEmpty()) {
             droppedPacketsLogged = false
         }
@@ -2271,7 +2333,7 @@ private class AudioRenderer(
             }
             AudioCodecKind.OPUS -> {
                 val accessUnit = rtp.copyOfRange(12, rtp.size)
-                if (accessUnit.size < MIN_OPUS_PACKET_BYTES) {
+                if (accessUnit.isEmpty()) {
                     shortOpusPackets++
                     if (!firstOpusShortPacketLogged) {
                         firstOpusShortPacketLogged = true
@@ -2282,7 +2344,20 @@ private class AudioRenderer(
                     }
                     return
                 }
-                feedCodec(accessUnit, timestampUs)
+                val software = softwareOpus
+                if (software != null) {
+                    diagnosticStage = "software-decoder-input"
+                    inputQueued++
+                    val decoded = software.decode(accessUnit)
+                    if (decoded != null) {
+                        outputBuffers++
+                        writePcm(decoded)
+                    } else {
+                        inputDropped++
+                    }
+                } else {
+                    feedCodec(accessUnit, timestampUs)
+                }
             }
         }
     }
@@ -2444,6 +2519,7 @@ private class AudioRenderer(
             writtenFramesThisWindow += framesWritten
             bufferProgress.written(count)
             lastPcmWriteNs = System.nanoTime()
+            outputHealth.output(lastPcmWriteNs)
             if (playbackStarted) reportNavigationPlayback(track)
             if (playbackStarted) trimClock(track)
             if (!playbackStarted) {
@@ -2606,6 +2682,7 @@ private class AudioRenderer(
         if (format.codec != AudioCodecKind.LPCM) {
             // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
+                "implementation=$decoderImplementation " +
                 "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                 "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
                 "outputBuffersTotal=$outputBuffers ended=$force"
@@ -2654,6 +2731,8 @@ private class AudioRenderer(
         NavigationPlayback.close(navigationPlaybackToken)
         AmbientMusicController.closeRenderer(ambientRendererToken)
         abandonAudioFocus()
+        softwareOpus?.close()
+        softwareOpus = null
         val codec = codec
         this.codec = null
         if (codec != null) {
@@ -2694,7 +2773,6 @@ private class AudioRenderer(
     private companion object {
         const val TAG = "xcertplay-usb"
         const val AAC_OBJECT_TYPE_LC = 2
-        const val MIN_OPUS_PACKET_BYTES = 4
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
         const val INPUT_TIMEOUT_US = 10_000L

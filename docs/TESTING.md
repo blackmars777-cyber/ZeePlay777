@@ -20,6 +20,31 @@ installation tests use the same FileProvider path shadow as diagnostic export te
 the real journal and provider logic; regression tests check stage persistence, sync failure and
 rejection of sibling directories outside the provider root.
 
+## Opus playback on head units without a platform decoder
+
+Host regression: `./gradlew :shared:testDebugUnitTest --tests '*OpusPlaybackWithoutPlatformDecoderTest' --tests '*SoftwareOpusDecoderTest' --tests '*AudioOutputHealthTest'`.
+The renderer test rejects platform codec creation and verifies that real encoded Opus and short
+silence packets still write PCM to AudioTrack on API 25 and 32. Unit tests cover continuous
+16/24/48 kHz sender audio decoded at 48 kHz, variable packet durations, malformed packets,
+Concentus assertion recovery and received-audio/no-output health transitions.
+
+Vehicle acceptance is still required. On the affected Zeekr DHU and a second firmware, with
+the vehicle parked, play navigation prompts repeatedly, invoke Siri, make a call and play music.
+Save a diagnostic report. Expect `Audio: decoder ready ... implementation=software name=concentus`
+for Opus, increasing `outputBuffersTotal` and `totalWrittenFrames`, and audible uninterrupted
+prompts. Verify navigation attenuation, call echo handling and disconnect/reconnect. Record
+any CPU load, crackling or video regression; host tests cannot establish real-time performance.
+AAC continues to use platform decoders; this change does not add an AAC software decoder.
+
+`Audio: decoder capabilities` records advertised platform candidates (not successful creation)
+and bundled-software availability. `Audio: unavailable ... reason=no_decoder` means the stream
+could not initialize a decoder and must not be mistaken for `Audio: ready`. A persistent input
+stream without PCM writes for two seconds emits `Audio: output health ... state=stalled` once,
+then `state=recovered` only after PCM writes resume. Idle gaps between prompts do not trigger
+this diagnostic. It does not reconnect the session automatically.
+Distinguish `decoderUnavailablePacketsTotal` from RTP `seqForwardGaps`: packets discarded
+because a decoder is unavailable are not evidence of network loss.
+
 ## Custom stream resolution
 
 In the home settings and the in-session menu, confirm the accepted range is **30–160%**. Try 160%, cancel an edit, save an unrelated setting, and reconnect; the exact saved percentage must survive. Enter 161% in the numeric dialog and confirm it stays open with an error. Reset must only change the draft to 100% until Save/Apply is selected.
