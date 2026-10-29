@@ -20,13 +20,12 @@ internal fun navigationRouteAttributes(navigationChannel: Int): AudioAttributes 
  * so a prompt plays over music without ducking it. The iPhone sends duckAudio before each prompt and
  * unduckAudio after it. With the option on, this holds a duckable temporary request with the navigation
  * route's attributes between the two. A head unit that plays only the focus owner's sound then plays
- * the prompt, and other sound can duck instead of being muted. Nothing is requested while the Audio
- * focus setting is off.
+ * the prompt, and other sound can duck instead of being muted. This opt-in is independent of the
+ * general renderer focus setting, so navigation can use a dedicated bus without enabling Siri focus.
  */
 internal class NavigationPromptFocus(
     context: Context?,
     private val promptFocusEnabled: Boolean,
-    private val audioFocusEnabled: Boolean,
     private val attributes: () -> AudioAttributes,
     private val report: (String) -> Unit = {},
     private val releaseDelayMillis: Long = RELEASE_DELAY_MILLIS,
@@ -39,19 +38,11 @@ internal class NavigationPromptFocus(
     }
     private var request: AudioFocusRequestCompat? = null
     private var pendingRelease: Runnable? = null
-    private var skipReported = false
     private var closed = false
 
     @Synchronized
     fun onDuck() {
         if (closed || !promptFocusEnabled) return
-        if (!audioFocusEnabled) {
-            if (!skipReported) {
-                skipReported = true
-                runCatching { report("Audio: navigation prompt focus skipped audioFocus=off") }
-            }
-            return
-        }
         val manager = manager ?: return
         if (request == null && !requestFocus(manager)) return
         // Each duck restarts the timeout, and a duck right after an unduck keeps the same request.

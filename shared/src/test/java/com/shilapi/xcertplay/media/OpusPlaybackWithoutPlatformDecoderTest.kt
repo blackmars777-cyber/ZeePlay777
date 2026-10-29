@@ -27,7 +27,10 @@ class OpusPlaybackWithoutPlatformDecoderTest {
         val encoder = SoftwareOpusEncoder(48_000)
         val source = ByteArray(1920) { index -> if (index % 2 == 0) (index % 127).toByte() else 8 }
         try {
-            play(encoder.encode(source).single(), "default", 101)
+            val reports = play(encoder.encode(source).single(), "default", 101)
+            val signal = reports.first { it.startsWith("Audio: voice output") }
+            val peak = Regex("pcmSubmittedPeak=(\\d+)").find(signal)!!.groupValues[1].toInt()
+            assertTrue("Decoded voice must report nonzero PCM before AudioTrack submission: $signal", peak > 0)
         } finally {
             encoder.close()
         }
@@ -52,7 +55,7 @@ class OpusPlaybackWithoutPlatformDecoderTest {
         assertTrue(queue.isEmpty())
     }
 
-    private fun play(opus: ByteArray, audioType: String, payloadType: Int) {
+    private fun play(opus: ByteArray, audioType: String, payloadType: Int): List<String> {
         RecordingTrack.written = CountDownLatch(1)
         RecordingTrack.bytes = 0
         val reports = CopyOnWriteArrayList<String>()
@@ -73,6 +76,7 @@ class OpusPlaybackWithoutPlatformDecoderTest {
             assertFalse("audio worker must release on close", worker.isAlive)
         }
         assertTrue(type.getDeclaredField("totalWrittenFrames").apply { isAccessible = true }.getLong(renderer) > 0)
+        return reports.toList()
     }
 
     private fun renderer(format: AudioFormat, reports: MutableList<String>): Any {

@@ -50,7 +50,7 @@ class AudioFocusSettingsTest {
         assertTrue(mute.isChecked)
     }
 
-    @Test fun navigationPromptFocusIsOffByDefaultAndShownOnlyWithAudioFocus() {
+    @Test fun navigationPromptFocusIsOffByDefaultAndCanBeEnabledWithGlobalFocusOff() {
         val activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
         activity.setTheme(android.R.style.Theme_Material_NoActionBar)
         activity.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
@@ -65,14 +65,18 @@ class AudioFocusSettingsTest {
             it.contentDescription == activity.getString(R.string.settings_navigation_prompt_audio_focus)
         }
         val mute = switches.single { it.contentDescription == activity.getString(R.string.audio_focus_auto_yield) }
-        assertSame(mute.parent.parent, prompts.parent.parent)
-        assertEquals(View.GONE, (prompts.parent.parent as View).visibility)
-        assertFalse(prompts.isChecked)
-        focus.isChecked = true
+        assertNotSame(mute.parent.parent, prompts.parent.parent)
         assertEquals(View.VISIBLE, (prompts.parent.parent as View).visibility)
-        prompts.isChecked = true
+        assertFalse(prompts.isChecked)
+        assertTrue(prompts.isEnabled)
+        assertEquals(View.VISIBLE, (prompts.parent as View).visibility)
+        assertTrue((prompts.parent as View).performClick())
+        assertTrue(prompts.isChecked)
+        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(activity))
         assertTrue(AirPlayPersistence.loadNavigationPromptAudioFocus(activity))
+        focus.isChecked = true
         focus.isChecked = false
+        assertEquals(View.VISIBLE, (prompts.parent.parent as View).visibility)
         assertTrue(AirPlayPersistence.loadNavigationPromptAudioFocus(activity))
         prompts.isChecked = false
         assertFalse(AirPlayPersistence.loadNavigationPromptAudioFocus(activity))

@@ -105,15 +105,11 @@ class NavigationPromptFocusTest {
         assertEquals(2, reports.size)
     }
 
-    @Test fun optionOffOrAudioFocusOffNeverRequests() {
+    @Test fun optionOffNeverRequests() {
         focus(enabled = false).onDuck()
-        val focusOff = focus(audioFocus = false)
-        focusOff.onDuck()
-        focusOff.onUnduck()
-        focusOff.onDuck()
         idle(NavigationPromptFocus.TIMEOUT_MILLIS)
         assertNull(shadowOf(manager).lastAudioFocusRequest)
-        assertEquals(listOf("Audio: navigation prompt focus skipped audioFocus=off"), reports)
+        assertTrue(reports.isEmpty())
     }
 
     @Test fun focusChangesWhileHeldAreReported() {
@@ -132,11 +128,7 @@ class NavigationPromptFocusTest {
         assertEquals(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE, navigationRouteAttributes(15).usage)
     }
 
-    @Test fun sinkAsksOnlyWithBothSettingsOnAndUsesTheChosenNavigationStream() {
-        val focusOff = AndroidMediaSink(context = context, audioFocusEnabled = false,
-            navigationPromptAudioFocus = true, onAudioDiagnostic = reports::add)
-        focusOff.onAudioDuck(true)
-        focusOff.close()
+    @Test fun sinkUsesTheChosenNavigationStreamAndItsOwnOptIn() {
         val optionOff = AndroidMediaSink(context = context, audioFocusEnabled = true, onAudioDiagnostic = reports::add)
         optionOff.onAudioDuck(true)
         optionOff.close()
@@ -156,8 +148,28 @@ class NavigationPromptFocusTest {
         assertTrue(reports.toString(), reports.any { it.startsWith("Audio: navigation prompt focus released reason=closed") })
     }
 
-    private fun focus(enabled: Boolean = true, audioFocus: Boolean = true, channel: Int = 0) =
-        NavigationPromptFocus(context, enabled, audioFocus, { navigationRouteAttributes(channel) }, reports::add)
+    @Test fun sinkRequestsNavigationRouteFocusWhileGlobalAudioFocusIsOffAndReleasesAfterPrompt() {
+        val sink = AndroidMediaSink(context = context, audioFocusEnabled = false,
+            mediaChannel = 1, navigationChannel = 0, navigationPromptAudioFocus = true,
+            onAudioDiagnostic = reports::add)
+        try {
+            sink.onAudioDuck(true)
+            val sent = shadowOf(manager).lastAudioFocusRequest
+            assertNotNull("The headrest navigation route must work without enabling global/Siri focus", sent)
+            assertEquals(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK, sent.durationHint)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                assertEquals(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE, sent.audioFocusRequest.audioAttributes.usage)
+            }
+            sink.onAudioDuck(true)
+            assertSame(sent, shadowOf(manager).lastAudioFocusRequest)
+            sink.onAudioDuck(false)
+            idle(NavigationPromptFocus.RELEASE_DELAY_MILLIS)
+            assertTrue(abandoned(sent))
+        } finally { sink.close() }
+    }
+
+    private fun focus(enabled: Boolean = true, channel: Int = 0) =
+        NavigationPromptFocus(context, enabled, { navigationRouteAttributes(channel) }, reports::add)
             .also(helpers::add)
 
     private fun idle(millis: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis))

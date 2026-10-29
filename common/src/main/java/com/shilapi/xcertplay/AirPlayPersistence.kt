@@ -267,7 +267,7 @@ object AirPlayPersistence {
             .apply()
     }
 
-    /** Opt-in (#946, #545): each navigation prompt requests duckable focus. Applies only while audio focus is on. */
+    /** Independent opt-in: each navigation prompt requests temporary duckable focus. */
     fun loadNavigationPromptAudioFocus(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_NAVIGATION_PROMPT_AUDIO_FOCUS, false)

@@ -219,7 +219,7 @@ class AndroidMediaSink(
     private val vendorLowLatencyDecoder: Boolean = false,
     /** Opt-in MTK ACodec low-latency/no-reorder modes, with per-session automatic fallback. */
     private val mtkDecoderTuningEnabled: Boolean = false,
-    /** Opt-in (#946): navigation prompts request duckable focus while the iPhone ducks audio. Needs [audioFocusEnabled]. */
+    /** Independent opt-in: navigation requests temporary focus while the iPhone ducks audio. */
     navigationPromptAudioFocus: Boolean = false,
 ) : MediaSink {
     // Each downlink publishes its own reference; a mic must match that stream and sample rate.
@@ -237,7 +237,6 @@ class AndroidMediaSink(
     private val navigationPromptFocus = NavigationPromptFocus(
         appContext,
         promptFocusEnabled = navigationPromptAudioFocus,
-        audioFocusEnabled = audioFocusEnabled,
         attributes = { navigationRouteAttributes(navigationChannel) },
         report = onAudioDiagnostic,
     )
@@ -1793,6 +1792,8 @@ private class AudioRenderer(
     private var softwareOpus: SoftwareOpusDecoder? = null
     private var decoderImplementation = "none"
     private val outputHealth = AudioOutputHealth()
+    private val voicePcmInput = VoicePcmSignal()
+    private val voicePcmSubmitted = VoicePcmSignal()
     @Volatile private var navigationAttenuationDb = 0
     private var appliedNavigationAttenuationDb: Int? = null
     private var pcm = ByteArray(64 * 1024)
@@ -2471,6 +2472,8 @@ private class AudioRenderer(
 
     private fun writePcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
         val track = track ?: return
+        val voice = mappedChannel == AudioChannel.NAVIGATION || mappedChannel == AudioChannel.ASSISTANT
+        if (voice) voicePcmInput.observe(data, offset, length)
         diagnosticStage = "track-write"
         if (!firstPcmLogged && length > 0) {
             firstPcmLogged = true
@@ -2486,6 +2489,7 @@ private class AudioRenderer(
             applyFadeIn(data, offset, length)
             fadeApplied = true
         }
+        if (voice) voicePcmSubmitted.observe(data, offset, length)
         var written = 0
         while (written < length && running) {
             val writeLength = if (playbackStarted) {
@@ -2679,6 +2683,18 @@ private class AudioRenderer(
             "playbackRate=${clockTrim?.rate ?: -1} ended=$force"
         Log.i(STATS_TAG, line)
         report(line)
+        if (mappedChannel == AudioChannel.NAVIGATION || mappedChannel == AudioChannel.ASSISTANT) {
+            val input = voicePcmInput.take()
+            val submitted = voicePcmSubmitted.take()
+            val device = currentTrack?.routedDevice
+            runCatching { report("Audio: voice output audioType=${format.audioType} " +
+                "usage=${trackAttributes?.usage ?: -1} legacyStream=${actualLegacyStreamType ?: "usage"} " +
+                "focus=$audioFocusEnabled routeId=${device?.id ?: -1} " +
+                "routeBus=${voiceBusDiagnostic(device?.type, device?.address)} " +
+                "sessionId=${currentTrack?.audioSessionId ?: -1} " +
+                "pcmInPeak=${input.peak} pcmSubmittedPeak=${submitted.peak} " +
+                "pcmSamples=${submitted.samples} nonZeroSamples=${submitted.nonZero} ended=$force") }
+        }
         if (format.codec != AudioCodecKind.LPCM) {
             // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +

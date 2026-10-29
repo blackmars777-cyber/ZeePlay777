@@ -56,6 +56,7 @@ internal object CarPlayMediaKeys {
     private var initialAlbumRecovery = InitialAlbumRecovery()
     private var initialAlbumRetry: Runnable? = null
     private var controller: CarPlayController? = null
+    private var zeekrSource: ZeekrMediaSource? = null
     private var session: MediaSession? = null
     private var focusRequest: AudioFocusRequestCompat? = null
     private var focusOwner: Any? = null
@@ -79,6 +80,14 @@ internal object CarPlayMediaKeys {
         }
         appContext = context.applicationContext
         controller = next
+        if (zeekrSource == null) {
+            zeekrSource = ZeekrMediaSource(context.applicationContext, send = { index ->
+                dispatchZeekrMediaCommand(mainHandler,
+                    current = { synchronized(this) { controller === next } },
+                    send = { send(index, "zeekr", next) },
+                )
+            }).also { source -> mainHandler.post { source.start() } }
+        }
         GeelyWheelKeys.start(context)
         com.shilapi.xcertplay.media.AmbientMusicController.claimPlaybackOwner(next)
         next.playbackListener = { playing ->
@@ -145,6 +154,7 @@ internal object CarPlayMediaKeys {
                 if (nowPlaying.elapsedMillis != update.elapsedMillis) elapsedUpdatedAt = SystemClock.elapsedRealtime()
                 val metadataChanged = metadataChanged(nowPlaying, update) || artwork !== previousArtwork
                 nowPlaying = update
+                zeekrSource?.update(update, artwork)
                 if (metadataChanged) ClusterMusicState.publish(update, artwork)
                 updateInitialAlbumRecovery(expected)
                 // The iPhone repeats NowPlayingUpdate about twice a second for the position alone.
@@ -189,6 +199,7 @@ internal object CarPlayMediaKeys {
             controller?.let { com.shilapi.xcertplay.media.AmbientMusicController.albumColorChanged(it, result?.color) }
             controller?.let(::updateInitialAlbumRecovery)
             session?.setMetadata(androidMetadata(nowPlaying, shownArtworkLocked()))
+            zeekrSource?.update(nowPlaying, artwork)
         }
     }
 
@@ -373,6 +384,8 @@ internal object CarPlayMediaKeys {
     }
 
     private fun releaseLocked() {
+        zeekrSource?.let { source -> source.deactivate(); mainHandler.post { source.close() } }
+        zeekrSource = null
         focusOwner = null
         controller?.let(com.shilapi.xcertplay.media.AmbientMusicController::releasePlaybackOwner)
         artworkOwner = null
@@ -418,17 +431,20 @@ internal object CarPlayMediaKeys {
         )
     }
 
-    private fun send(index: Int, source: String) {
+    private fun send(index: Int, source: String, expected: CarPlayController? = null): Boolean {
+        val active = synchronized(this) { controller?.takeIf { expected == null || it === expected } }
+        if (expected != null && active == null) return false
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
         if (CarPlayVideo.onMediaKey(index)) {
             Log.i(TAG, "media key $source -> car video player $index")
             WheelKeyLog.note("media key $source -> car video player $index")
-            return
+            return true
         }
-        val sent = synchronized(this) { controller }?.sendMediaButton(index) ?: false
+        val sent = active?.sendMediaButton(index) ?: false
         Log.i(TAG, "media key $source -> CarPlay $index sent=$sent")
         WheelKeyLog.note("media key $source -> CarPlay $index sent=$sent")
+        return sent
     }
 
     private fun notUsed(source: String) {
@@ -437,7 +453,12 @@ internal object CarPlayMediaKeys {
     }
 
     /** A steering-wheel media key captured outside the Android key stream (Geely/Lynk). */
-    internal fun onExternalMediaKey(index: Int) = send(index, "geely-wheel")
+    internal fun onExternalMediaKey(index: Int) { send(index, "geely-wheel") }
+
+    /** System source entry point; never starts a connection or forwards to an absent iPhone. */
+    @Synchronized
+    internal fun onZeekrSourceSelected(source: Int, display: Int): Boolean =
+        zeekrSource?.select(source, display) == true
 
     /** The steering-wheel microphone key captured outside the Android key stream (Geely/Lynk). */
     internal fun onExternalSiriKey(): Boolean {
@@ -448,7 +469,7 @@ internal object CarPlayMediaKeys {
     private val callback = CarPlayMediaCallback(
         experimentalDiLink3Keys = { appContext?.let(BydOutputSettings::carPlayCallControls) == true },
         notUsed = ::notUsed,
-        send = ::send,
+        send = { index, source -> send(index, source) },
     )
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */

@@ -66,7 +66,10 @@ class AudioStream(
             runCatching { data.receiveBufferSize = AUDIO_RECEIVE_BUFFER_BYTES }
         }
         onDiagnostic("Audio UDP receive buffer type=$streamType original=$originalBufferBytes requested=$AUDIO_RECEIVE_BUFFER_BYTES actual=${runCatching { data.receiveBufferSize }.getOrDefault(0)}")
-        val control = bindAnyPort()
+        val control = try { bindAnyPort() } catch (error: Exception) {
+            data.close()
+            throw error
+        }
         dataSocket = data
         controlSocket = control
         dataThread = Thread({ runData(data, listener) }, "airplay-audio-rx").apply {
@@ -191,9 +194,17 @@ class AudioStream(
 
     private fun bindAnyPort(): DatagramSocket {
         val socket = DatagramSocket(null)
-        socket.reuseAddress = true
-        socket.bind(InetSocketAddress(InetAddress.getByName("::"), 0))
-        return socket
+        try {
+            // RTP and RTCP have separate readers. Linux can assign an already-bound UDP port
+            // when address reuse is enabled, allowing a new prompt/control reader to consume
+            // music packets. Every live endpoint needs an exclusive ephemeral port.
+            socket.reuseAddress = false
+            socket.bind(InetSocketAddress(InetAddress.getByName("::"), 0))
+            return socket
+        } catch (error: Exception) {
+            socket.close()
+            throw error
+        }
     }
 
     private fun readU32Be(source: ByteArray, offset: Int): Int =
