@@ -1,0 +1,7 @@
+Zeekr identification logo
+Source: https://github.com/vehiclespecs/brand-logos/blob/3f0929e70e0a9a2a502063edc4b3e5c0146cba74/zeekr-logo.png
+Repository commit: 3f0929e70e0a9a2a502063edc4b3e5c0146cba74
+The original 150 x 150 PNG is included unchanged as the Zeekr edition's default
+CarPlay return-to-car icon and icon preview. It is not the Zeekr launcher icon.
+Logo trademarks belong to their respective owners. The repository's MIT license
+covers its curation and metadata, not the logo images. See LICENSE.txt.

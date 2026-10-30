@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val edition = rootProject.extra["diplayEdition"] as String
+@Suppress("UNCHECKED_CAST")
+val editionConfig = rootProject.extra["diplayEditionConfig"] as Map<String, String>
+
 // Optional local-only input. CI and ordinary source builds contain no accessory identity.
 val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
     .orNull?.let { file(it).canonicalFile }
@@ -18,7 +22,10 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 41
-        versionName = "0.2.22"
+        versionName = "0.2.22" + editionConfig.getValue("versionNameSuffix")
+        if (edition == "zeekr") {
+            manifestPlaceholders["editionApplicationLabel"] = editionConfig.getValue("applicationLabel")
+        }
 
     }
 
@@ -39,15 +46,27 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".hudtest"
-            versionNameSuffix = "-hud-test"
+            applicationIdSuffix = editionConfig.getValue("debugApplicationIdSuffix")
+            versionNameSuffix = editionConfig.getValue("debugVersionNameSuffix")
         }
         release {
+            applicationIdSuffix = editionConfig.getValue("releaseApplicationIdSuffix")
             optimization {
                 enable = false
             }
             signingConfig = signingConfigs.getByName("release")
         }
+    }
+    sourceSets.getByName("debug") {
+        manifest.srcFile(editionConfig.getValue("debugManifest"))
+        // The BYD HUD demo is an upstream debug tool, not part of the Zeekr test application.
+        if (edition == "zeekr") {
+            java.setSrcDirs(emptyList<String>())
+            kotlin.setSrcDirs(emptyList<String>())
+        }
+    }
+    if (edition == "zeekr") {
+        sourceSets.getByName("release").manifest.srcFile("src/zeekr/AndroidManifest.xml")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

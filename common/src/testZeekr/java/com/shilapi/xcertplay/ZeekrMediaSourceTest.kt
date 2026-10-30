@@ -36,6 +36,18 @@ import org.robolectric.shadows.ShadowContentResolver
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], shadows = [FileProviderPathTestShadow::class])
 class ZeekrMediaSourceTest {
+    @Test fun editionFactoryCannotStartOrSendAfterItsControllerIsReleased() {
+        val car = FakeCar()
+        val source = createVehicleMediaSource(car.context, Handler(Looper.getMainLooper()),
+            current = { false }, send = { fail("released controller received a media command"); false })
+        source.deactivate()
+        idle()
+        assertEquals(0, car.binds)
+        assertFalse(source.select(6, 0))
+        source.close()
+        idle()
+    }
+
     @Test fun unavailableCoreUsesDirectSupportServiceAndPublishesThePhoneSource() {
         val car = FakeCar(initFailures = Int.MAX_VALUE, initFailureReason = 305, directPresent = true)
         val sent = mutableListOf<Int>()

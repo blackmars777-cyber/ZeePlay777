@@ -127,7 +127,7 @@ internal fun createZeekrPlaybackInfo(
             reply.writeInt(if (uri == null) 0 else 1)
             uri?.writeToParcel(reply, 0)
         }
-        25 -> reply.writeString("DiPlay")
+        25 -> reply.writeString(com.shilapi.xcertplay.host.BuildConfig.EDITION_APPLICATION_LABEL)
         27 -> reply.writeString(packageName)
         29 -> reply.writeInt(1) // play/pause VR controls
         31, 32 -> reply.writeInt(-1)

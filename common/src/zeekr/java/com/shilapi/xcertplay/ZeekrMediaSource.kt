@@ -29,7 +29,7 @@ internal class ZeekrMediaSource(
     private val context: Context,
     private val send: (Int) -> Boolean,
     workerHandler: Handler? = null,
-) {
+) : VehicleMediaSource {
     private data class Snapshot(val info: CarPlayNowPlaying = CarPlayNowPlaying(), val artwork: Bitmap? = null,
         val positionAt: Long = SystemClock.elapsedRealtime())
     private data class Publication(val info: CarPlayNowPlaying = CarPlayNowPlaying(), val artwork: Uri? = null,
@@ -171,7 +171,7 @@ internal class ZeekrMediaSource(
         if (bound) note("binding CoreService") else startDirect()
     }
 
-    fun update(info: CarPlayNowPlaying, artwork: Bitmap?) {
+    override fun update(info: CarPlayNowPlaying, artwork: Bitmap?) {
         if (closed) return
         val old = snapshot
         val anchor = if (old.info.elapsedMillis != info.elapsedMillis || old.info.playing != info.playing)
@@ -180,7 +180,7 @@ internal class ZeekrMediaSource(
         if (bound || directBound) queuePublish()
     }
 
-    fun close() {
+    override fun close() {
         closed = true // Old Binder callbacks stop forwarding controls immediately.
         stopBinding()
         stopDirectBinding()
@@ -207,9 +207,9 @@ internal class ZeekrMediaSource(
         }
     }
 
-    fun deactivate() { closed = true }
+    override fun deactivate() { closed = true }
 
-    fun select(source: Int, display: Int): Boolean = source == ZeekrMediaProtocol.SOURCE &&
+    override fun select(source: Int, display: Int): Boolean = source == ZeekrMediaProtocol.SOURCE &&
         display == 0 && control(epoch, CarPlayMediaButton.PLAY)
 
     private fun stopBinding() {

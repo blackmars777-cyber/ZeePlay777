@@ -3,6 +3,9 @@
 Use this procedure to build the DiPlay app for an Android head unit.
 Run the commands from the repository root, where `gradlew` and `settings.gradle.kts` are located.
 
+For the optional Zeekr edition, build configuration and standalone car-test packaging are described
+in [ZEEKR-BUILD.md](ZEEKR-BUILD.md). Ordinary commands build the standard edition.
+
 ## Select the application
 
 This repository contains several Android applications.

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.zeekr.coreservice" />
+        <package android:name="com.zeekr.mediacenter" />
+    </queries>
+    <application>
+        <meta-data android:name="ZeekrMediaClientSupport" android:resource="@xml/zeekr_media_config" />
+        <service android:name="com.shilapi.xcertplay.ZeekrMediaIntentService" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.acton.send.mediacenter" />
+            </intent-filter>
+        </service>
+        <provider android:name="com.shilapi.xcertplay.ZeekrArtworkProvider"
+            android:authorities="${applicationId}.zeekr-artwork"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/zeekr_artwork_paths" />
+        </provider>
+    </application>
+</manifest>

@@ -6,7 +6,7 @@ import android.os.IBinder
 
 /** Media-center discovery/cold entry point. An absent iPhone is never reported as playing. */
 class ZeekrMediaIntentService : Service() {
-    private val endpoint = createZeekrSelectionEndpoint(CarPlayMediaKeys::onZeekrSourceSelected)
+    private val endpoint = createZeekrSelectionEndpoint(CarPlayMediaKeys::onVehicleSourceSelected)
 
     override fun onBind(intent: Intent?): IBinder = endpoint
 
@@ -14,7 +14,7 @@ class ZeekrMediaIntentService : Service() {
         // Matches the SDK's state-recovery Intent contract. This handles the command and exits;
         // the existing DiPlay session service owns the actual connection and audio lifetime.
         zeekrSelection(intent?.getStringExtra("operation"), intent?.getStringExtra("operationData"),
-            CarPlayMediaKeys::onZeekrSourceSelected)
+            CarPlayMediaKeys::onVehicleSourceSelected)
         stopSelf(startId)
         return START_NOT_STICKY
     }

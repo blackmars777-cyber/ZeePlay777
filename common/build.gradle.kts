@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val edition = rootProject.extra["diplayEdition"] as String
+@Suppress("UNCHECKED_CAST")
+val editionConfig = rootProject.extra["diplayEditionConfig"] as Map<String, String>
+
 android {
     namespace = "com.shilapi.xcertplay.host"
     compileSdk {
@@ -11,6 +15,23 @@ android {
 
     defaultConfig {
         minSdk = 24
+        buildConfigField("String", "DEFAULT_OEM_LABEL", "\"${editionConfig.getValue("carPlayOemLabel")}\"")
+        buildConfigField("String", "EDITION_APPLICATION_LABEL", "\"${editionConfig.getValue("applicationLabel")}\"")
+    }
+
+    sourceSets {
+        getByName("main") {
+            kotlin.srcDir("src/$edition/java")
+            assets.srcDir("src/$edition/assets")
+        }
+        getByName("test").kotlin.srcDir("src/test${edition.replaceFirstChar { it.uppercaseChar() }}/java")
+        // Build-type overlays can replace default resources; two main res directories cannot.
+        getByName("debug").res.srcDir("src/$edition/res")
+        getByName("release").res.srcDir("src/$edition/res")
+        if (edition == "zeekr") {
+            getByName("debug").manifest.srcFile("src/zeekr/AndroidManifest.xml")
+            getByName("release").manifest.srcFile("src/zeekr/AndroidManifest.xml")
+        }
     }
 
     compileOptions {
@@ -19,6 +40,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
