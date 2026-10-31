@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="android.car.permission.CAR_ENERGY" />
+    <uses-permission android:name="android.car.permission.CAR_INFO" />
     <queries>
+        <package android:name="com.aptiv.wifi" />
         <package android:name="com.zeekr.coreservice" />
         <package android:name="com.zeekr.mediacenter" />
     </queries>
     <application>
+        <uses-library android:name="android.car" android:required="false" />
         <meta-data android:name="ZeekrMediaClientSupport" android:resource="@xml/zeekr_media_config" />
         <service android:name="com.shilapi.xcertplay.ZeekrMediaIntentService" android:exported="true">
             <intent-filter>

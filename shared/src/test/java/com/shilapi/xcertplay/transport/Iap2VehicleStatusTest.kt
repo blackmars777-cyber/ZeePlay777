@@ -67,6 +67,19 @@ class Iap2VehicleStatusTest {
         assertEquals(25_000, ByteBuffer.wrap(parameters.first(24)!!.payload).int)
     }
 
+    @Test
+    fun percentOnlySourceOmitsUnverifiedFieldsAndTheirRangeCapabilities() {
+        val status = reading.copy(rangeAvailable = false, chargingAvailable = false,
+            currentChargeWh = null, maxChargeWh = null, batteryPercent = 55.0)
+        val update = Iap2ParameterList.parse(Iap2VehicleStatus.update(status).payload)
+        for (id in listOf(3, 6, 11, 15, 21, 22, 23, 25, 30)) assertNull(update.first(id))
+        assertEquals(55_000, ByteBuffer.wrap(update.first(24)!!.payload).int)
+        val config = identification(true).withVehicleStatusFrom { status }
+        val declared = Iap2ParameterList.parse(parameters(config).first(21)!!.payload)
+        for (id in listOf(3, 6, 11, 15, 30)) assertNull(declared.first(id))
+        assertTrue(declared.first(21) != null)
+    }
+
     private fun connectors(choice: EvChargingConnectors): List<Int> {
         val config = identification(vehicleStatusEnabled = true).copy(chargingConnectors = choice)
         val vehicle = Iap2ParameterList.parse(parameters(config).first(20)!!.payload)

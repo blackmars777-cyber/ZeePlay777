@@ -6,6 +6,11 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
 }
 
+// Refuse the removed mobile-overlay switch instead of silently building an install-over APK.
+require(!providers.gradleProperty("diplay.vehicleProbe").isPresent) {
+    "diplay.vehicleProbe has been removed; use :vehicleprobe:assembleDebug or scripts/build-zeekr-vehicle-probe.sh"
+}
+
 // Explicit build input: branch names never change the contents of an APK implicitly.
 val edition = providers.gradleProperty("diplay.edition").getOrElse("standard")
 require(edition in setOf("standard", "zeekr")) {

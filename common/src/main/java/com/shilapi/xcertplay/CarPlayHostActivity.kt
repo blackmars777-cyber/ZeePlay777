@@ -182,6 +182,16 @@ open class CarPlayHostActivity : ComponentActivity() {
         super.attachBaseContext(AppLocale.wrap(newBase))
     }
 
+    private val vehicleData by lazy { createVehicleDataSource(applicationContext) }
+
+    private fun batteryToIphoneEnabled(): Boolean = if (vehicleData != null) {
+        com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphone(this)
+    } else com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this)
+
+    private fun parkedVideoEnabled(): Boolean = if (vehicleData != null) {
+        com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParked(this)
+    } else com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this)
+
     // CH341 USB\VID_1A86&PID_5512&REV_0304 is the deployment-supplied bridge identity.
     private fun createRuntimeConfig(): CarPlayRuntimeConfig = CarPlayRuntimeConfig(
         mfiTarget = mfiTarget,
@@ -208,10 +218,10 @@ open class CarPlayHostActivity : ComponentActivity() {
             hardwareVersion = "1.0",
             carPlayUsbInterfaceNumber = 3,
             locationInformationEnabled = locationReportingEnabled,
-            vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
+            vehicleStatusEnabled = batteryToIphoneEnabled(),
             chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
             vehicleSpeedEnabled = locationReportingEnabled &&
-                (com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) || EcarxWheelSpeed.present()),
+                (vehicleData != null || com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) || EcarxWheelSpeed.present()),
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -5103,7 +5113,7 @@ open class CarPlayHostActivity : ComponentActivity() {
             model = normalizedModel(),
             oemLabel = oemLabel,
             icons = listOf(loadAirPlayIcon()),
-            videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
+            videoInCar = parkedVideoEnabled(),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
             speechWithout8And16Khz = AirPlayPersistence.loadSpeechWithout8And16Khz(this),
             callAtCallRate = AirPlayPersistence.loadCallAtCallRate(this),
@@ -5626,6 +5636,7 @@ open class CarPlayHostActivity : ComponentActivity() {
         // Settings → Connection can change the target while this screen stays open (#696).
         mfiTarget = AirPlayPersistence.loadMfiTarget(this)
         runCatching { DiPlayBootstrap.ensure(this, mfiTarget) }
+        if (batteryToIphoneEnabled() || parkedVideoEnabled()) vehicleData?.warmUp()
         val config = createRuntimeConfig()
         val effectiveSize = if (isMultiWindowActive() && !AirPlayPersistence.loadAdaptPipResolution(this) &&
             maximumDetectedWidthPixels >= size.width && maximumDetectedHeightPixels >= size.height &&
@@ -5638,6 +5649,9 @@ open class CarPlayHostActivity : ComponentActivity() {
         val locationProvider: Iap2LocationProvider? =
             when {
                 !config.locationReportingEnabled -> null
+                config.identification.vehicleSpeedEnabled && vehicleData != null -> VehicleSpeedLocationProvider(
+                    AndroidCarPlayLocationProvider(this), vehicleData!!.speed(), log = ::appendLog,
+                )
                 config.identification.vehicleSpeedEnabled &&
                     !com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) ->
                     // ECARX: the head unit has no GPS of its own, so only the wheel speed goes to the iPhone.
@@ -5703,8 +5717,8 @@ open class CarPlayHostActivity : ComponentActivity() {
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
             locationProvider = locationProvider,
-            vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this)) {
-                com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext)
+            vehicleStatusProvider = if (batteryToIphoneEnabled()) {
+                vehicleData?.battery ?: com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext)
             } else {
                 null
             },
@@ -5713,7 +5727,7 @@ open class CarPlayHostActivity : ComponentActivity() {
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
         CarPlayMediaKeys.attach(this, next)
-        if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
+        if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next, vehicleData?.let { data -> { data.parked() } })
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,

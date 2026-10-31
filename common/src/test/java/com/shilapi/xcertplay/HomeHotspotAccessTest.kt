@@ -157,6 +157,43 @@ class HomeHotspotAccessTest {
         assertEquals(0, PlatformStart.calls.get())
     }
 
+    @Test fun openingDiPlayStartsTheSavedSystemHotspotWithoutImportedCredentials() {
+        AirPlayPersistence.saveManualHotspotSsid(context, "")
+        AirPlayPersistence.saveManualHotspotPassphrase(context, "")
+        WritePermission.allowed = true
+        val home = openHome().get()
+        awaitResult(home, CarHotspotTethering.Result.READY)
+        assertEquals(1, PlatformStart.calls.get())
+        assertEquals("", AirPlayPersistence.loadManualHotspotSsid(context))
+    }
+
+    @Test fun returningToDiPlayRestartsAHotspotThatWasTurnedOffElsewhere() {
+        WritePermission.allowed = true
+        val controller = openHome()
+        awaitResult(controller.get(), CarHotspotTethering.Result.READY)
+        controller.pause().stop()
+        HotspotState.on = false
+        controller.restart().start().resume()
+        repeat(250) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (PlatformStart.calls.get() == 2) return
+            Thread.sleep(20)
+        }
+        assertEquals(2, PlatformStart.calls.get())
+    }
+
+    @Test fun enablingTheSwitchStartsTheHotspotImmediately() {
+        CarHotspotSettings.setEnabled(context, false)
+        WritePermission.allowed = true
+        val home = openHome().get()
+        val content = android.widget.LinearLayout(home)
+        ReflectionHelpers.callInstanceMethod<Unit>(home, "systemHotspotSettings",
+            ReflectionHelpers.ClassParameter.from(android.widget.LinearLayout::class.java, content))
+        descendants(content).filterIsInstance<android.widget.Switch>().single().isChecked = true
+        awaitResult(home, CarHotspotTethering.Result.READY)
+        assertEquals(1, PlatformStart.calls.get())
+    }
+
     /** The platform's tethering call, which turns the car hotspot on. */
     @Implements(className = "com.shilapi.xcertplay.network.PlatformTetheringStart", isInAndroidSdk = false)
     class PlatformStart {

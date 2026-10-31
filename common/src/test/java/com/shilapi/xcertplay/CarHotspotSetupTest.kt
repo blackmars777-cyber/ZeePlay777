@@ -76,14 +76,14 @@ class CarHotspotSetupTest {
         assertTrue(eligible())
     }
 
-    @Test fun startupNeedsValidCredentialsAndNoExistingSession() {
+    @Test fun startupUsesSystemCredentialsAndNeedsNoExistingSession() {
         CarHotspotSettings.setEnabled(context, true)
-        assertFalse(eligible())
+        assertTrue(eligible())
         configureHotspot()
         assertTrue(eligible())
         assertFalse(CarHotspotSetup.shouldStartOnLaunch(context, hasSession = true))
         AirPlayPersistence.saveManualHotspotPassphrase(context, "short")
-        assertFalse(eligible())
+        assertTrue(eligible())
     }
 
     @Test fun wiredModeNeverPreparesAHotspotEvenWhenTheChoiceIsSaved() {

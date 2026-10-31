@@ -48,13 +48,19 @@ internal object CarPlayVideo : CarPlayVideoListener {
     var pendingSeekMillis: Int? = null
     var activity: CarPlayVideoActivity? = null
 
-    fun attach(context: Context, next: CarPlayController) {
+    @Volatile private var readVehicleParked: (() -> Boolean?)? = null
+
+    fun attach(context: Context, next: CarPlayController, parked: (() -> Boolean?)? = null) {
         appContext = context.applicationContext
         controller = next
+        readVehicleParked = parked
         next.videoListener = this
     }
 
-    override fun readParked(): Boolean? = appContext?.let(BydNavigationOutputs::parked)
+    override fun readParked(): Boolean? {
+        val source = readVehicleParked
+        return if (source != null) source() else appContext?.let(BydNavigationOutputs::parked)
+    }
 
     override fun onVideoAllowedChanged(allowed: Boolean) {
         if (!allowed) main.post { closePlayer("the car left P") }

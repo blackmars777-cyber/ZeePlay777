@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.network
 
 import android.content.Context
+import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -19,9 +20,9 @@ data class CarHotspotSavedCredentials(
 /**
  * Reads the car's saved hotspot configuration without touching it. Android 7.1 reads from the app:
  * getWifiApConfiguration is hidden, but its only service-side gate is ACCESS_WIFI_STATE and the
- * stored WifiConfiguration still carries the raw SSID and passphrase. Android 11+ reads through the
- * shell helper, because the service enforces the signature NETWORK_SETTINGS permission that the
- * shell holds. WPA3 configurations are read as-is; DiPlay publishes them unchanged.
+ * stored WifiConfiguration still carries the raw SSID and passphrase. Android 11+ first tries the
+ * local SoftApConfiguration, as Zeekr projection does. If the firmware hides or denies that API,
+ * use the shell helper with its NETWORK_SETTINGS permission. WPA3 is preserved unchanged.
  */
 object CarHotspotConfigRead {
     enum class Reason { UNSUPPORTED_SDK, ADB_UNAVAILABLE, UNAVAILABLE }
@@ -41,8 +42,33 @@ object CarHotspotConfigRead {
             log("car hotspot config: unsupported Android $sdk")
             return Outcome(reason = Reason.UNSUPPORTED_SDK)
         }
-        return if (sdk <= Build.VERSION_CODES.N_MR1) readWithApp(context, log)
-        else readWithAdb(LocalAdb(AdbKeys.load(context)), context.applicationInfo.sourceDir, mayAsk, log)
+        if (sdk <= Build.VERSION_CODES.N_MR1) return readWithApp(context, log)
+        // Projection on Zeekr 7.2.3 reads the local AP config for the QR credentials. TCAM's
+        // display-name callback is not proof of the password/security of this Android AP.
+        return readModernOrFallback({
+            val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
+            WifiManager::class.java.getMethod("getSoftApConfiguration").invoke(wifi) as? SoftApConfiguration
+        }, {
+            readWithAdb(LocalAdb(AdbKeys.load(context)), context.applicationInfo.sourceDir, mayAsk, log)
+        }, log)
+    }
+
+    /** Read locally first; permission/hidden-API failures retain the explicit ADB import path. */
+    internal fun readModernOrFallback(
+        read: () -> SoftApConfiguration?,
+        fallback: () -> Outcome,
+        log: (String) -> Unit,
+    ): Outcome {
+        val credentials = try {
+            val config = read()
+            savedCredentials(config?.ssid, config?.passphrase.orEmpty(),
+                config?.securityType?.let(::securityOf), log)
+        } catch (error: Exception) {
+            // Never log framework reply text here: OEM errors may include the AP credentials.
+            log("car hotspot config: local read unavailable (${error.javaClass.simpleName})")
+            null
+        }
+        return if (credentials != null) Outcome(credentials) else fallback()
     }
 
     private fun readWithApp(context: Context, log: (String) -> Unit): Outcome {

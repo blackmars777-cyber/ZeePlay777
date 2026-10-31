@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.network
 
+import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiConfiguration
 import android.util.Base64
 import com.shilapi.xcertplay.adb.FakeAdbd
@@ -126,6 +127,27 @@ class CarHotspotConfigReadTest {
         }
         assertNull(CarHotspotConfigRead.readApp({ enterprise }, ::log).credentials)
         assertNull(CarHotspotConfigRead.readApp({ null }, ::log).credentials)
+    }
+
+    @Test @Config(sdk = [31])
+    fun localProjectionCredentialsNeedNoAdbAndKeepSecurity() {
+        val builder = SoftApConfiguration.Builder()
+        builder.javaClass.getMethod("setSsid", String::class.java).invoke(builder, "Car-007")
+        val config = builder.setPassphrase("password1", SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION).build()
+        val outcome = CarHotspotConfigRead.readModernOrFallback({ config }, { fail("Unexpected ADB"); error("ADB") }, ::log)
+        assertEquals(CarHotspotSavedCredentials("Car-007", "password1", ManualHotspotSecurity.WPA3_TRANSITION), outcome.credentials)
+        assertFalse(logs.any { it.contains("password1") })
+    }
+
+    @Test @Config(sdk = [31])
+    fun localReadDenialOrMissingCredentialsUsesAdb() {
+        val expected = CarHotspotConfigRead.Outcome(reason = CarHotspotConfigRead.Reason.ADB_UNAVAILABLE)
+        var calls = 0
+        val fallback = { calls++; expected }
+        assertEquals(expected, CarHotspotConfigRead.readModernOrFallback({ throw SecurityException("password1") }, fallback, ::log))
+        assertEquals(expected, CarHotspotConfigRead.readModernOrFallback({ null }, fallback, ::log))
+        assertEquals(2, calls)
+        assertFalse(logs.any { it.contains("password1") })
     }
 
     @Test fun unsupportedSecurityTypesDoNotMap() {

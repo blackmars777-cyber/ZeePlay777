@@ -28,6 +28,10 @@ android {
             path = file('src/main/jni/Android.mk')
         }
     }
+    sourceSets {
+        main.kotlin.srcDir("src/${rootProject.ext.diplayEdition}/java")
+        test.kotlin.srcDir("src/test${rootProject.ext.diplayEdition.capitalize()}/java")
+    }
     buildFeatures {
         // Geely/Lynk head-unit input API (com.geely.inputservice); declarations in src/main/aidl.
         aidl true

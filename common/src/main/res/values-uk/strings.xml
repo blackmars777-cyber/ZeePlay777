@@ -966,4 +966,6 @@
     <string name="cluster_projection_shape_description">На пів екрана швидкість і стан, які панель зазвичай показує, залишаються поруч із картою; на весь екран карта займає всю панель. DiPlay задає цей вигляд щоразу, коли з&#8217;являється карта CarPlay, інакше він перекриває вигляд, вибраний в автомобілі. Потрібен ADB через мережу на головному пристрої.</string>
     <string name="settings_cluster_speedometer_album_color">Колір альбому для тла спідометра</string>
     <string name="settings_cluster_speedometer_album_color_description">Плавно змінює тло на колір рамки альбому. Зберігає вибрану непрозорість.</string>
+    <string name="settings_auto_car_hotspot_vehicle_description">Під час відкриття або повернення до DiPlay та перед бездротовим з’єднанням застосунок намагається ввімкнути точку доступу через службу автомобіля. Цій службі не потрібні ADB чи дозвіл змінювати системні налаштування. Підтримка залежить від прошивки. Точка доступу не вимикається автоматично.</string>
+    <string name="settings_hotspot_vehicle_service_detected">Виявлено службу точки доступу автомобіля</string>
 </resources>

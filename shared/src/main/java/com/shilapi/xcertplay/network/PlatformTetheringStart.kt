@@ -9,9 +9,9 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 
 /**
- * Starts the car's saved hotspot through the platform's IConnectivityManager.startTethering, which
- * WRITE_SETTINGS access authorizes on Android 8.0 to 10. Every attempt is reported, so a firmware that
- * refuses it can be told apart from a call that never reached the system.
+ * Starts the saved hotspot through IConnectivityManager on Android 8–10 and TetheringManager
+ * on Android 11+. WRITE_SETTINGS access and firmware API visibility are still required. Every
+ * attempt is reported, distinguishing firmware rejection from a call that never reached the system.
  *
  * The binder object is a non-public IConnectivityManager.Stub.Proxy. Its own member can be unreachable
  * (non-SDK restrictions, or class access checks), so the method is looked up on the interface first,
@@ -30,7 +30,7 @@ internal object PlatformTetheringStart {
     )
 
     /**
-     * The switch that relies on this call is offered on Android 8.0 to 10 only.
+     * The switch that relies on this call is offered from Android 8.0.
      *
      * Android 7 refuses the call from every app: its isTetheringSupported() asks UserManager.isAdminUser()
      * under the caller's identity, which needs MANAGE_USERS ("You either need MANAGE_USERS or CREATE_USERS
@@ -38,12 +38,16 @@ internal object PlatformTetheringStart {
      * skips that check, but on Android 7 only startTethering marks the access point for tethering, so a
      * hotspot started that way would give the iPhone no address.
      *
-     * Android 11 moved tethering out of IConnectivityManager into the tethering module, which an app
-     * cannot reach.
+     * Android 11 moved tethering into TetheringManager. Try its entry point as the Zeekr projection
+     * app does; hidden API or service permission denial still falls back to authorized ADB.
      */
-    fun supported(sdk: Int = Build.VERSION.SDK_INT): Boolean = sdk in Build.VERSION_CODES.O..Build.VERSION_CODES.Q
+    fun supported(sdk: Int = Build.VERSION.SDK_INT): Boolean = sdk >= Build.VERSION_CODES.O
 
     fun start(context: Context, receiver: ResultReceiver, log: (String) -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            ModernTetheringStart.start(context, receiver, log)
+            return
+        }
         val failures = mutableListOf<String>()
         fun attempt(): Boolean {
             val service = connectivityService(context, failures) ?: return false

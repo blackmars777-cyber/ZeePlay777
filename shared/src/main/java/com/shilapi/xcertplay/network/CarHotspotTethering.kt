@@ -16,6 +16,9 @@ import java.util.concurrent.locks.ReentrantLock
  *  the saved configuration; writes happen once from the settings screen, after the driver confirms. */
 object CarHotspotTethering {
     private val startupLock = ReentrantLock()
+    @Volatile private var vehicleDiagnostic = "not attempted"
+    fun vehicleServiceDiagnostic(): String = vehicleDiagnostic
+    private const val NO_CHANGE_TETHERING_PERMISSION = 14
     enum class Result(val diagnostic: String) {
         READY("Car hotspot is on"),
         PERMISSION_REQUIRED("Hotspot control permission is missing"),
@@ -24,6 +27,8 @@ object CarHotspotTethering {
         TIMED_OUT("Timed out waiting for the car hotspot"),
         CANCELLED("Hotspot startup was cancelled"),
     }
+
+    fun vehicleServiceAvailable(context: Context): Boolean = VehicleHotspotStart.available(context)
 
     fun permitted(context: Context): Boolean = Settings.System.canWrite(context)
 
@@ -73,6 +78,12 @@ object CarHotspotTethering {
             stateWithAdbObservation({ CarHotspotStatus.isEnabled(context) }, observedAdbState),
             startFallback = startAdb,
             start = startReflection,
+            startVehicle = {
+                val stages = java.util.concurrent.CopyOnWriteArrayList<String>()
+                vehicleDiagnostic = "requesting"
+                VehicleHotspotStart.request(context, deadline, isCancelled) { stage -> stages += stage; log(stage) }
+                    .also { vehicleDiagnostic = "$it ${stages.takeLast(3).joinToString(" | ")}".trim() }
+            },
         ).also {
             if (it != Result.READY && it != Result.CANCELLED)
                 log("car hotspot: Android state=${CarHotspotStatus.isEnabled(context) ?: "unknown"} writeSettings=${permitted(context)}")
@@ -113,6 +124,16 @@ object CarHotspotTethering {
     ): Result = enableUntil(System.nanoTime() + timeoutMillis * 1_000_000L,
         isCancelled, canWrite, isEnabled, startFallback, start)
 
+    internal fun enableWithVehicle(
+        timeoutMillis: Long,
+        isCancelled: () -> Boolean,
+        canWrite: () -> Boolean,
+        isEnabled: () -> Boolean?,
+        startVehicle: () -> VehicleHotspotRequestResult,
+        start: (ResultReceiver) -> Unit,
+    ): Result = enableUntil(System.nanoTime() + timeoutMillis * 1_000_000L,
+        isCancelled, canWrite, isEnabled, null, start, startVehicle)
+
     private fun enableUntil(
         deadline: Long,
         isCancelled: () -> Boolean,
@@ -120,6 +141,7 @@ object CarHotspotTethering {
         isEnabled: () -> Boolean?,
         startFallback: (() -> Boolean)?,
         start: (ResultReceiver) -> Unit,
+        startVehicle: (() -> VehicleHotspotRequestResult)? = null,
     ): Result {
         fun stopped(): Result? = when {
             isCancelled() || Thread.currentThread().isInterrupted -> Result.CANCELLED
@@ -142,9 +164,17 @@ object CarHotspotTethering {
             val initialState = isEnabled()
             stopped()?.let { return it }
             if (initialState == true) return Result.READY
-            val permission = canWrite()
+            // OEM service owns its own permissions; the app's WRITE_SETTINGS gate must not block it.
+            val vehicle = startVehicle?.invoke() ?: VehicleHotspotRequestResult.UNAVAILABLE
             stopped()?.let { return it }
-            if (!permission) return Result.PERMISSION_REQUIRED
+            when (vehicle) {
+                VehicleHotspotRequestResult.TIMED_OUT -> return Result.TIMED_OUT
+                VehicleHotspotRequestResult.CANCELLED -> return Result.CANCELLED
+                else -> Unit
+            }
+            val vehicleStarted = vehicle == VehicleHotspotRequestResult.ACCEPTED
+            if (!vehicleStarted && !canWrite()) return if (vehicle == VehicleHotspotRequestResult.REJECTED)
+                Result.FAILED else Result.PERMISSION_REQUIRED
             fun fallback(): Boolean {
                 stopped()?.let { return false }
                 return try { startFallback?.invoke() == true } catch (error: Exception) {
@@ -153,13 +183,14 @@ object CarHotspotTethering {
                 }
             }
             val unknown = initialState == null
-            if (unknown) {
+            if (unknown && !vehicleStarted) {
                 if (!fallback()) return stopped() ?: Result.UNSUPPORTED
             }
             val response = AtomicInteger(-1)
+            var callbackFallbackAttempted = false
             try {
                 stopped()?.let { return it }
-                if (!unknown) {
+                if (!unknown && !vehicleStarted) {
                     start(object : ResultReceiver(null) {
                         override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                             response.set(resultCode)
@@ -186,7 +217,16 @@ object CarHotspotTethering {
                 val enabled = isEnabled()
                 stopped()?.let { return it }
                 if (enabled == true) return Result.READY
-                if (response.get() > 0) return Result.FAILED
+                val code = response.get()
+                if (code > 0) {
+                    // Modern TetheringManager reports permission denial asynchronously, rather than
+                    // throwing SecurityException. Give it the same bounded ADB recovery, once only.
+                    if (code != NO_CHANGE_TETHERING_PERMISSION) return Result.FAILED
+                    if (callbackFallbackAttempted) return Result.PERMISSION_REQUIRED
+                    callbackFallbackAttempted = true
+                    if (!fallback()) return stopped() ?: Result.PERMISSION_REQUIRED
+                    response.set(-1)
+                }
                 val remainingMillis = (deadline - System.nanoTime()) / 1_000_000L
                 if (remainingMillis <= 0) return Result.TIMED_OUT
                 try {

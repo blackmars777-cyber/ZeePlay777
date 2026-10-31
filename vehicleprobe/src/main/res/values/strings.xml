@@ -1,0 +1,9 @@
+<resources>
+    <string name="zeekr_probe_title">极氪车辆数据探针</string>
+    <string name="zeekr_probe_description">只读车辆数据探测。请在驻车时启动，行驶日志由乘员采集；停止后可导出报告。</string>
+    <string name="zeekr_probe_permissions">申请车辆数据权限</string>
+    <string name="zeekr_probe_start">开始／重新探测</string>
+    <string name="zeekr_probe_stop">停止探测</string>
+    <string name="zeekr_probe_share">导出探测报告</string>
+    <string name="zeekr_probe_idle">尚未开始探测</string>
+</resources>

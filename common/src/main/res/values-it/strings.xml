@@ -1044,4 +1044,6 @@
     <string name="cluster_projection_shape_description">Mezza schermata mantiene accanto alla mappa la velocità e lo stato che il quadro strumenti mostra normalmente; schermo intero lascia che la mappa occupi tutto il quadro. DiPlay imposta questa forma ogni volta che appare la mappa di CarPlay, che altrimenti annulla la forma scelta nell’auto. Richiede ADB in rete sull’unità principale.</string>
     <string name="settings_cluster_speedometer_album_color">Usa il colore dell’album per lo sfondo del tachimetro</string>
     <string name="settings_cluster_speedometer_album_color_description">Abbina il colore della cornice dell’album con transizioni fluide. Mantiene l’opacità selezionata.</string>
+    <string name="settings_auto_car_hotspot_vehicle_description">All’apertura o al ritorno a DiPlay e prima di una connessione wireless, tenta di attivare l’hotspot tramite il servizio dell’auto. Questo servizio non richiede ADB né l’accesso alla modifica delle impostazioni di sistema. Il supporto dipende dal firmware. L’hotspot non viene spento automaticamente.</string>
+    <string name="settings_hotspot_vehicle_service_detected">Servizio hotspot dell’auto rilevato</string>
 </resources>

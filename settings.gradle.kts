@@ -31,3 +31,6 @@ include(":maphost")
 project(":maphost").projectDir = file("samples/maphost")
 include(":home")
 project(":home").projectDir = file("samples/home")
+
+// Independent read-only diagnostic app; no dependency on the DiPlay application modules.
+include(":vehicleprobe")

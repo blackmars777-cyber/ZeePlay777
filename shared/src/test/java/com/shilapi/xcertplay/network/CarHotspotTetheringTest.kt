@@ -18,6 +18,34 @@ import com.shilapi.xcertplay.network.CarHotspotTethering.Result
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class CarHotspotTetheringTest {
+    @Test fun vehicleServicePrecedesPermissionGateAndDoesNotStartTwice() {
+        var on = false
+        assertEquals(Result.READY, CarHotspotTethering.enableWithVehicle(500, { false },
+            { fail("No app permission required for the vehicle service"); false }, { on },
+            { on = true; VehicleHotspotRequestResult.ACCEPTED }, { fail("No second startup") }))
+    }
+
+    @Test fun vehicleRequestTimeoutDoesNotFallThroughToAnotherMutation() {
+        assertEquals(Result.TIMED_OUT, CarHotspotTethering.enableWithVehicle(500, { false }, { true },
+            { false }, { VehicleHotspotRequestResult.TIMED_OUT }, { fail("Late duplicate startup") }))
+    }
+
+    @Test fun modernPermissionCallbackFallsBackAndStillRequiresObservedReadiness() {
+        var state = false
+        var calls = 0
+        val result = CarHotspotTethering.enable(500, { false }, { true }, { state },
+            startFallback = { calls++; state = true; true }, start = { it.send(14, null) })
+        assertEquals(Result.READY, result)
+        assertEquals(1, calls)
+        assertEquals(Result.TIMED_OUT, CarHotspotTethering.enable(25, { false }, { true }, { false },
+            startFallback = { true }, start = { it.send(14, null) }))
+    }
+
+    @Test fun modernPermissionCallbackWithoutAdbReportsPermissionRequired() {
+        assertEquals(Result.PERMISSION_REQUIRED, CarHotspotTethering.enable(500, { false }, { true }, { false },
+            startFallback = { false }, start = { it.send(14, null) }))
+    }
+
     @Test fun startFailuresNameTheUnderlyingCause() {
         assertEquals("NoSuchFieldException: mService", CarHotspotTethering.describe(NoSuchFieldException("mService")))
         assertEquals("InvocationTargetException caused by SecurityException: uid 10123",

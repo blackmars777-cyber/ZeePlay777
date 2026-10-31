@@ -41,11 +41,15 @@ def verify(apk_path, edition, auth_assets=None, aapt2=None):
             require(apk.read(path) == (resource_root / resource).read_bytes(), resource)
         require(("assets/brand-logos/NOTICE.txt" in names) == zeekr, "logo attribution")
         dex = b"".join(apk.read(name) for name in names if name.endswith(".dex"))
-        for cls in ("ZeekrMediaSource", "ZeekrMediaIntentService", "ZeekrArtworkProvider"):
+        for cls in ("ZeekrMediaSource", "ZeekrMediaIntentService", "ZeekrArtworkProvider",
+                    "ZeekrVehicleData", "ZeekrVehicleState", "ReflectiveZeekrSensorClient"):
             descriptor = f"Lcom/shilapi/xcertplay/{cls};".encode()
             require((descriptor in dex) == zeekr, cls)
+        require((b"Lcom/shilapi/xcertplay/network/VehicleHotspotStart;" in dex), "hotspot edition factory")
+        require((b"com.aptiv.wifi.wifimanager.IAptivWIfiConnectionManager" in dex) == zeekr,
+                "Aptiv hotspot protocol edition isolation")
         manifest = apk.read("AndroidManifest.xml")
-        for declaration in ("ZeekrMediaClientSupport", "com.zeekr.coreservice", "com.zeekr.mediacenter"):
+        for declaration in ("ZeekrMediaClientSupport", "com.zeekr.coreservice", "com.zeekr.mediacenter", "com.aptiv.wifi"):
             present = any(declaration.encode(encoding) in manifest for encoding in ("utf-8", "utf-16le"))
             require(present == zeekr, declaration)
         if zeekr:

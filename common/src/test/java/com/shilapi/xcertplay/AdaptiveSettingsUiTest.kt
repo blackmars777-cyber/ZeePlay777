@@ -47,6 +47,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
@@ -554,13 +555,13 @@ class AdaptiveSettingsUiTest {
         assertFalse(index().any { it.title == title })
         AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         shadowOf(context.packageManager).removePackage("com.byd.carsettings")
-        // Other head units up to Android 10 get the switch through "Modify system settings" access instead of ADB.
+        // Other head units from Android 8 get the switch through "Modify system settings" access instead of ADB.
         assertEquals(SettingsCategory.CONNECTION, index().single { it.title == title }.category)
         assertTrue(HotspotSearchProbe.workers.isEmpty())
     }
 
     @Test
-    @Config(sdk = [25, 33], shadows = [HotspotSearchProbe::class])
+    @Config(sdk = [25], shadows = [HotspotSearchProbe::class])
     fun hotspotSwitchStaysHiddenOffBydUnitsWhereAndroidLetsNoAppStartTethering() {
         AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         HotspotSearchProbe.workers.clear()
@@ -569,6 +570,57 @@ class AdaptiveSettingsUiTest {
         val index = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
             screen, "buildSettingsSearchIndex")
         assertFalse(index.any { it.title == screen.getString(R.string.auto_car_hotspot_title) })
+    }
+
+    @Test @Config(sdk = [31, 33], shadows = [HotspotSearchProbe::class])
+    fun modernHotspotControlIsSearchableWithoutAnAdbProbe() {
+        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
+        HotspotSearchProbe.workers.clear()
+        val screen = openSettings()
+        val index = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
+            screen, "buildSettingsSearchIndex")
+        assertEquals(SettingsCategory.CONNECTION,
+            index.single { it.title == screen.getString(R.string.auto_car_hotspot_title) }.category)
+        assertTrue(HotspotSearchProbe.workers.isEmpty())
+    }
+
+    @Test @Config(sdk = [31], qualifiers = "en-w320dp-h600dp-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun modernHotspotScreenshotCompactLargeFont() = captureModernHotspot("compact", 1.3f)
+
+    @Test @Config(sdk = [31], qualifiers = "en-w1000dp-h700dp-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun modernHotspotScreenshotFullLargeFont() = captureModernHotspot("full", 1.3f)
+
+    private fun captureModernHotspot(name: String, fontScale: Float) {
+        RuntimeEnvironment.setFontScale(fontScale)
+        val screen = openSettings()
+        // Render the production hotspot card directly, so evidence includes its full description
+        // rather than depending on Robolectric's ScrollView display-list invalidation.
+        val content = LinearLayout(screen).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xff0c1119.toInt())
+        }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "systemHotspotSettings",
+            ReflectionHelpers.ClassParameter.from(LinearLayout::class.java, content))
+        val width = screen.resources.displayMetrics.widthPixels
+        content.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        content.layout(0, 0, width, content.measuredHeight)
+        val control = descendants(content).filterIsInstance<Switch>().single {
+            it.contentDescription == screen.getString(R.string.auto_car_hotspot_title)
+        }
+        assertTrue(control.width > 0 && control.height > 0)
+        assertTrue(control.right <= (control.parent as View).width)
+        val bitmap = Bitmap.createBitmap(width, content.height, Bitmap.Config.ARGB_8888)
+        try {
+            content.draw(Canvas(bitmap))
+            val output = Paths.get("build/reports/modern-hotspot-ui/$name.png")
+            Files.createDirectories(output.parent)
+            Files.newOutputStream(output).use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @Test fun cardControlsShareOneHeightAndGap() {

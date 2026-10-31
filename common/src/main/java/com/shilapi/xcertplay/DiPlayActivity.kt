@@ -267,6 +267,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val adbSwitches = mutableMapOf<Int, Pair<Switch, () -> Boolean>>()
     private var hotspotStartupResult: CarHotspotTethering.Result? = null
     @Volatile private var startupHotspotCancelled = false
+    @Volatile private var startupHotspotGeneration = 0
     @Volatile private var vehicleProbeGeneration = 0
     @Volatile private var vehicleValidationGeneration = 0
     private val vehicleOperationLock = Any()
@@ -513,6 +514,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         cancelUsbPermissionSetup()
         clusterSafeAreaDialog?.dismiss()
         startupHotspotCancelled = true
+        startupHotspotGeneration++
         super.onStop()
         if (!isFinishing && !isChangingConfigurations) {
             CenterMapOverlay.scheduleShow()
@@ -531,12 +533,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             return
         }
         handler.removeCallbacks(tick); handler.post(tick)
-        // Back with the hotspot access now allowed: the start-up attempt that lacked it runs again.
         if (hotspotStartupResult == CarHotspotTethering.Result.PERMISSION_REQUIRED && CarHotspotTethering.permitted(this)) {
             hotspotStartupResult = null
-            startupHotspotCancelled = false
-            startCarHotspotOnLaunch()
         }
+        // Also covers returning from permission/car settings or reopening DiPlay after the hotspot
+        // was turned off. Each attempt owns a generation so a stopped worker cannot be revived.
+        startCarHotspotOnLaunch()
         // The background check runs two minutes after opening, usually while CarPlay is in front: what it
         // found shows when DiPlay comes back, not only after the activity is created again.
         availableUpdate = UpdateAvailability.available(this, version())
@@ -547,7 +549,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         pausedForAdbSwitchChange = false
         if (initialLaunch) {
             initialLaunch = false
-            startCarHotspotOnLaunch()
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
                 DiPlayPreferences.autoConnect(this) && requestedPage(intent) == null && page != "setup") {
                 handler.post { connect(DiPlayPreferences.autoConnectWireless(this)) }
@@ -961,7 +962,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (startupProblem != null) {
             // Off BYD units the access is allowed on Android's "Modify system settings" screen; ADB plays no part.
             val allowOnSystemScreen = startupProblem == CarHotspotTethering.Result.PERMISSION_REQUIRED &&
-                !CarHotspotSetup.isBydHeadUnit(this) && CarHotspotTethering.appStartSupported()
+                !CarHotspotSetup.isBydHeadUnit(this) && CarHotspotTethering.appStartSupported() &&
+                !CarHotspotTethering.vehicleServiceAvailable(this)
             card.addView(label(if (allowOnSystemScreen) getString(R.string.settings_write_settings_missing)
                 else hotspotResultText(startupProblem), 15, WARNING))
             if (!compact) card.addView(
@@ -2830,26 +2832,32 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun carHotspotOff(): Boolean =
         AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
             CarHotspotSettings.reportedOff(this, com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this)) &&
-            !(CarHotspotSettings.enabled(this) && CarHotspotTethering.permitted(this))
+            !(CarHotspotSettings.enabled(this) &&
+                (CarHotspotTethering.permitted(this) || CarHotspotTethering.vehicleServiceAvailable(this)))
 
     /**
      * Other head units: starting the hotspot needs only Android's "Modify system settings" access
      * (WRITE_SETTINGS), which the driver allows on the system screen. No ADB is involved.
      */
     private fun systemHotspotSettings(parent: LinearLayout) {
+        val vehicle = CarHotspotTethering.vehicleServiceAvailable(this)
         section(parent, getString(R.string.settings_car_hotspot_control), R.drawable.ic_dp_permissions) { card ->
             toggle(card, getString(R.string.auto_car_hotspot_title),
-                getString(R.string.settings_auto_car_hotspot_system_description), CarHotspotSettings.enabled(this)) { enabled ->
+                getString(if (vehicle) R.string.settings_auto_car_hotspot_vehicle_description
+                    else R.string.settings_auto_car_hotspot_system_description), CarHotspotSettings.enabled(this)) { enabled ->
                 CarHotspotSettings.setEnabled(this, enabled)
                 if (!enabled) startupHotspotCancelled = true
-                else if (!CarHotspotTethering.permitted(this)) openWriteSettingsAccess()
+                else {
+                    startCarHotspotOnLaunch()
+                    if (!vehicle && !CarHotspotTethering.permitted(this)) openWriteSettingsAccess()
+                }
             }
             val permitted = CarHotspotTethering.permitted(this)
-            card.addView(label(getString(if (permitted) R.string.settings_write_settings_granted
-                else R.string.settings_write_settings_missing), 14, if (permitted) READY else MUTED).apply {
+            card.addView(label(getString(if (vehicle) R.string.settings_hotspot_vehicle_service_detected
+                else if (permitted) R.string.settings_write_settings_granted else R.string.settings_write_settings_missing), 14, if (permitted) READY else MUTED).apply {
                 setPadding(0, dp(6), 0, dp(4))
             })
-            if (!permitted) {
+            if (!permitted && !vehicle) {
                 card.addView(button(getString(R.string.settings_write_settings_allow), false) { openWriteSettingsAccess() },
                     matchButton(8, 54))
             }
@@ -3003,14 +3011,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun startCarHotspotOnLaunch() {
         if (!startupHotspotEligible()) return
+        val generation = ++startupHotspotGeneration
+        startupHotspotCancelled = false
         val app = applicationContext
         Thread({
             val result = CarHotspotTethering.enable(app,
-                isCancelled = { startupHotspotCancelled || !startupHotspotEligible() },
+                isCancelled = { startupHotspotCancelled || generation != startupHotspotGeneration || !startupHotspotEligible() },
                 log = { Log.i("DiPlay-Hotspot", it) },
             )
             runOnUiThread {
-                if (isFinishing || isDestroyed || result == CarHotspotTethering.Result.CANCELLED) return@runOnUiThread
+                if (isFinishing || isDestroyed || generation != startupHotspotGeneration ||
+                    result == CarHotspotTethering.Result.CANCELLED) return@runOnUiThread
                 hotspotStartupResult = result
                 if (page == "home") render()
             }
@@ -6044,6 +6055,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             "writeSettings=${CarHotspotTethering.permitted(appContext)} " +
             "bydHeadUnit=${runCatching { CarHotspotSetup.isBydHeadUnit(appContext) }.getOrNull()} " +
             "hotspotOn=${runCatching { com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) }.getOrNull()}")
+        appendLine("Car hotspot vehicle service: available=${CarHotspotTethering.vehicleServiceAvailable(appContext)} " +
+            "last=${CarHotspotTethering.vehicleServiceDiagnostic()}")
         appendLine(WheelKeyService.report(appContext))
         WheelKeyLog.report(WheelKeyService.connected()).forEach { appendLine(it) }
         appendLine()

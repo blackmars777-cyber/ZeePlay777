@@ -29,12 +29,20 @@ jobs:
         run: ./gradlew -Pdiplay.edition=${{ matrix.edition }} :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest :mobile:lintDebug :home:lintDebug :maphost:lintDebug :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug --stacktrace
       - name: Verify edition contents
         run: python3 scripts/verify_edition_apk.py mobile/build/outputs/apk/debug/mobile-debug.apk --edition ${{ matrix.edition }}
+      - name: Standalone vehicle probe checks
+        if: matrix.edition == 'zeekr'
+        run: |
+          ./gradlew :vehicleprobe:testDebugUnitTest :vehicleprobe:lintDebug :vehicleprobe:assembleDebug
+          python3 scripts/verify_vehicle_probe_apk.py vehicleprobe/build/outputs/apk/debug/vehicleprobe-debug.apk
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.edition }}
           path: |
+            vehicleprobe/build/reports/probe-dashboard/
+            vehicleprobe/build/reports/tests/
+            vehicleprobe/build/reports/lint-results-debug.html
             shared/build/reports/tests/
             common/build/reports/tests/
             common/build/reports/album-artwork-ui/
