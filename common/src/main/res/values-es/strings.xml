@@ -956,4 +956,10 @@
     <string name="settings_cluster_speedometer_album_color_description">Iguala el color del borde del álbum con transiciones suaves. Conserva la opacidad elegida.</string>
     <string name="settings_auto_car_hotspot_vehicle_description">Al abrir o volver a DiPlay y antes de una conexión inalámbrica, intenta activar el punto de acceso mediante el servicio del coche. Este servicio no necesita ADB ni permiso para modificar ajustes del sistema. La compatibilidad depende del firmware. No se apaga automáticamente.</string>
     <string name="settings_hotspot_vehicle_service_detected">Servicio de punto de acceso del coche detectado</string>
+    <string name="settings_native_vehicle_description">Leer velocidad, marcha, carga y autonomía dinámica mediante la interfaz del vehículo sin ADB. El vídeo en estacionamiento requiere validación aparte.</string>
+    <string name="settings_native_vehicle_battery_description">Compartir carga y autonomía dinámica medidas con el iPhone. Se aplica en la próxima conexión.</string>
+    <string name="settings_native_vehicle_speed_description">Compartir velocidad y marcha al activar la ubicación. Se aplica en la próxima conexión.</string>
+    <string name="settings_native_vehicle_permissions">Solicitar permisos de datos del vehículo</string>
+    <string name="settings_native_vehicle_check">Comprobar datos del vehículo</string>
+    <string name="settings_native_vehicle_title">Datos del vehículo Zeekr (experimental)</string>
 </resources>

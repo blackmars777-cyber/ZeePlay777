@@ -113,6 +113,42 @@ class ZeekrVehicleStateTest {
         assertNull(state.parked(now + 10))
     }
 
+    @Test fun observedUnknownStatusFeedsReadOnlyDataButNeverParkVideo() {
+        val (state, ticket) = started()
+        state.publish(ticket, event(72f, available = -1), event(3, available = -1),
+            event(53f, 1, -1), now, true, event(277, 1, -1))
+        assertEquals(20.0, state.drain(now)!!.samples.single().metersPerSecond, 0.00001)
+        val status = state.battery(now)!!
+        assertEquals(53.0, status.batteryPercent, 0.0)
+        assertEquals(277, status.rangeKm)
+        assertTrue(status.rangeAvailable)
+        assertFalse(status.rangeWarningAvailable)
+        assertFalse(status.maxRangeAvailable)
+        assertFalse(status.chargingAvailable)
+        assertNull(state.parked(now))
+        state.publish(ticket, event(0f, available = -1), event(0, available = -1),
+            event(53f, available = -1), now, true, event(276, available = -1))
+        assertNull(state.parked(now))
+        assertEquals(276, state.battery(now)!!.rangeKm) // Never hard-code the calibration value.
+        state.invalidate(ticket)
+        assertNull(state.battery(now))
+        assertNull(state.drain(now))
+    }
+
+    @Test fun unknownOldStoppedCacheIsNotRestampedAndRangeFailuresDoNotEraseSoc() {
+        val (state, ticket) = started()
+        state.publish(ticket, event(0f, 1, -1), event(0, 1, -1), event(53f, 1, -1),
+            now, true, event(277, 1, 1))
+        assertNull(state.drain(now))
+        assertNull(state.parked(now))
+        assertEquals(53.0, state.battery(now)!!.batteryPercent, 0.0)
+        assertFalse(state.battery(now)!!.rangeAvailable)
+        for (bad in listOf(event(277, available = null), event(3001), event(-1), event(277.5), event(277, timestamp = now+1))) {
+            state.publish(ticket, event(0f), event(0), event(53f), now, false, bad)
+            assertFalse(state.battery(now)!!.rangeAvailable)
+        }
+    }
+
     @Test fun unitAndEnumProfileIsNotAppliedToOtherModelsOrNewFirmware() {
         val version = "zeekr_dhu-userdebug 12 SQ3A.220705.003.A1 eng.buildf.20260902.185825 test-keys"
         assertTrue(ZeekrVehicleState.supported("Zeekr DHU for arm64", version))

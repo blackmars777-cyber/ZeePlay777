@@ -80,6 +80,21 @@ class Iap2VehicleStatusTest {
         assertTrue(declared.first(21) != null)
     }
 
+    @Test
+    fun measuredRangeDoesNotInventWarningMaximumRangeOrCharging() {
+        val status = reading.copy(rangeKm = 277, batteryPercent = 53.0, currentChargeWh = null,
+            maxChargeWh = null, chargingAvailable = false, rangeWarningAvailable = false, maxRangeAvailable = false)
+        val update = Iap2ParameterList.parse(Iap2VehicleStatus.update(status).payload)
+        assertEquals(277, ByteBuffer.wrap(update.first(11)!!.payload).short.toInt())
+        assertEquals(53_000, ByteBuffer.wrap(update.first(24)!!.payload).int)
+        for (id in listOf(6, 15, 21, 22, 23, 25, 30)) assertNull(update.first(id))
+        val config = identification(true).withVehicleStatusFrom { status }
+        val declared = Iap2ParameterList.parse(parameters(config).first(21)!!.payload)
+        assertTrue(declared.first(3) != null)
+        assertTrue(declared.first(11) != null)
+        for (id in listOf(6, 15, 30)) assertNull(declared.first(id))
+    }
+
     private fun connectors(choice: EvChargingConnectors): List<Int> {
         val config = identification(vehicleStatusEnabled = true).copy(chargingConnectors = choice)
         val vehicle = Iap2ParameterList.parse(parameters(config).first(20)!!.payload)

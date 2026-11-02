@@ -58,6 +58,7 @@ internal class ZeekrVehicleData(
         override fun status(): String = state.status()
     }
     override val battery = VehicleStatusProvider { touch(); state.battery(clock()) }
+    override fun diagnostic(): String = state.status()
     override fun parked(): Boolean? { touch(); return state.parked(clock()) }
 
     override fun warmUp() = ensureWorker(resetFailures = true)
@@ -112,19 +113,20 @@ internal class ZeekrVehicleData(
             connectedAt = now
         }
         val readingClient = client ?: return
+        if (readingClient.lost) { fail(activeGeneration, IllegalStateException("CarSensor disconnected")); return }
         if (!readingClient.ready()) {
             if (clock() - connectedAt >= CONNECT_TIMEOUT_NS) fail(activeGeneration, IllegalStateException("CarSensor not ready"))
             return
         }
         // A service-loss callback retires the epoch immediately, including during a slow read.
-        if (readingClient.lost) { fail(activeGeneration, IllegalStateException("CarSensor disconnected")); return }
         state.connected(ticket)
-        val speed = readingClient.read(SPEED)
-        val gear = readingClient.read(GEAR)
-        val battery = readingClient.read(BATTERY)
+        val speed = runCatching { readingClient.read(SPEED) }.getOrNull()
+        val gear = runCatching { readingClient.read(GEAR) }.getOrNull()
+        val battery = runCatching { readingClient.read(BATTERY) }.getOrNull()
+        val range = runCatching { readingClient.read(RANGE) }.getOrNull()
         val afterRead = clock() // New events may arrive during RPC, so do not compare with a pre-read clock.
         if (!current(activeGeneration) || readingClient.lost) { state.invalidate(ticket); return }
-        state.publish(ticket, speed, gear, battery, afterRead, speedWanted)
+        state.publish(ticket, speed, gear, battery, afterRead, speedWanted, range)
         attempts = 0
         if (afterRead - lastSummaryAt >= 30_000_000_000L) {
             Log.i(TAG, state.status())
@@ -158,7 +160,7 @@ internal class ZeekrVehicleData(
     }
 
     /** Terminal teardown; invalidation is immediate and vendor cleanup stays on the worker. */
-    @Synchronized internal fun close() {
+    @Synchronized override fun close() {
         if (closed) return
         closed = true
         generation++
@@ -179,6 +181,7 @@ internal class ZeekrVehicleData(
         const val SPEED = 291504647
         const val GEAR = 289408000
         const val BATTERY = 1610612780
+        const val RANGE = 1610612745
     }
 }
 
@@ -216,7 +219,7 @@ internal class ReflectiveZeekrSensorClient(context: Context, private val disconn
         if (manager != null) return true
         val next = invoke(car, "getCarManager", "sensor") ?: error("CarSensor manager missing")
         supported = (invoke(next, "getSupportedSensors") as IntArray).toSet()
-        check(ZeekrVehicleData.SPEED in supported && ZeekrVehicleData.GEAR in supported) { "Motion sensors unsupported" }
+        check(listOf(ZeekrVehicleData.SPEED, ZeekrVehicleData.GEAR, ZeekrVehicleData.BATTERY, ZeekrVehicleData.RANGE).any { it in supported }) { "Vehicle sensors unsupported" }
         val type = Class.forName("android.car.hardware.CarSensorManager\$OnSensorChangedListener")
         val observer = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { proxy, method, args ->
             when (method.name) {
@@ -229,13 +232,13 @@ internal class ReflectiveZeekrSensorClient(context: Context, private val disconn
         listener = observer
         manager = next // Retain it even when registration fails, so cleanup unregisters partial subscriptions.
         val rate = next.javaClass.getField("SENSOR_RATE_NORMAL").getInt(null)
-        for (id in listOf(ZeekrVehicleData.SPEED, ZeekrVehicleData.GEAR)) {
-            check(invoke(next, "registerListener", observer, id, rate) == true) { "Sensor $id rejected" }
+        for (id in listOf(ZeekrVehicleData.SPEED, ZeekrVehicleData.GEAR, ZeekrVehicleData.BATTERY, ZeekrVehicleData.RANGE)) {
+            if (id in supported) {
+                val accepted = runCatching { invoke(next, "registerListener", observer, id, rate) == true }.getOrDefault(false)
+                if (!accepted) supported = supported - id
+            }
         }
-        if (ZeekrVehicleData.BATTERY in supported) {
-            val accepted = runCatching { invoke(next, "registerListener", observer, ZeekrVehicleData.BATTERY, rate) == true }.getOrDefault(false)
-            if (!accepted) supported = supported - ZeekrVehicleData.BATTERY
-        }
+        check(supported.any { it in listOf(ZeekrVehicleData.SPEED, ZeekrVehicleData.GEAR, ZeekrVehicleData.BATTERY, ZeekrVehicleData.RANGE) }) { "Vehicle subscriptions rejected" }
         return true
     }
 
@@ -245,7 +248,7 @@ internal class ReflectiveZeekrSensorClient(context: Context, private val disconn
         val type = event.javaClass
         val timestamp = type.getField("timestamp").getLong(event)
         val availability = runCatching { type.getField("availability").getInt(event) }.getOrNull()
-        val number = if (id == ZeekrVehicleData.GEAR) {
+        val number = if (id == ZeekrVehicleData.GEAR || id == ZeekrVehicleData.RANGE) {
             (type.getField("intValues").get(event) as IntArray).firstOrNull()
         } else (type.getField("floatValues").get(event) as FloatArray).firstOrNull()
         return ZeekrSensorValue(timestamp, number, availability)

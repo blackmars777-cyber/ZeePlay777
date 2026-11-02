@@ -1705,7 +1705,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }, matchButton(0, 56))
             if (bydVehicleAdvancedExpanded) {
                 advancedVehicleData(card)
-                if (!BydOutputSettings.available(this)) clusterSongSwitch(card)
+                if (!BydOutputSettings.available(this) && !nativeVehicleDataSupported()) clusterSongSwitch(card)
             }
         }
     }
@@ -4535,7 +4535,60 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         BydNavigationOutputs.carPlayCallsChanged(enabled)
     }
 
+    private fun nativeVehicleDataSettings(card: LinearLayout) {
+        card.addView(label(getString(R.string.settings_native_vehicle_title), 18, TEXT))
+        card.addView(label(getString(R.string.settings_native_vehicle_description), 14, MUTED))
+        toggle(card, getString(R.string.car_battery_for_the_iphone),
+            getString(R.string.settings_native_vehicle_battery_description), BydOutputSettings.batteryToIphone(this)) {
+            BydOutputSettings.setBatteryToIphone(this, it)
+            markReconnectNeeded()
+        }
+        toggle(card, getString(R.string.wheel_speed_for_tunnels),
+            getString(R.string.settings_native_vehicle_speed_description), BydOutputSettings.wheelSpeedToIphone(this)) {
+            BydOutputSettings.setWheelSpeedToIphone(this, it)
+            markReconnectNeeded()
+        }
+        card.addView(button(getString(R.string.settings_native_vehicle_permissions), false) {
+            requestPermissions(arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_ENERGY"), 724)
+        }, matchButton(SETTINGS_BLOCK_GAP_DP))
+        card.addView(button(getString(R.string.settings_native_vehicle_check), false) {
+            checkNativeVehicleData()
+        }, matchButton(SETTINGS_BLOCK_GAP_DP))
+    }
+
+    private var nativeVehicleCheckRunning = false
+    private fun checkNativeVehicleData() {
+        if (nativeVehicleCheckRunning) return
+        nativeVehicleCheckRunning = true
+        toast(getString(R.string.probing_vehicle_data))
+        Thread({
+            val source = createVehicleDataSource(applicationContext)
+            val result = try {
+                source?.warmUp()
+                val deadline = android.os.SystemClock.elapsedRealtime() + 5000
+                while (source != null && source.battery.snapshot() == null && android.os.SystemClock.elapsedRealtime() < deadline) {
+                    Thread.sleep(100)
+                }
+                val permissions = listOf("CAR_SPEED", "CAR_POWERTRAIN", "CAR_ENERGY", "CAR_INFO").joinToString("\n") {
+                    "$it=${checkSelfPermission("android.car.permission.$it")}"
+                }
+                "$permissions\n\n${source?.diagnostic() ?: "unavailable"}"
+            } catch (error: Exception) { error.javaClass.simpleName }
+            finally { source?.close() }
+            runOnUiThread {
+                nativeVehicleCheckRunning = false
+                if (!isFinishing && !isDestroyed) appDialogBuilder()
+                    .setTitle(R.string.settings_native_vehicle_check).setMessage(result)
+                    .setPositiveButton(R.string.close, null).show()
+            }
+        }, "Zeekr-vehicle-check").start()
+    }
+
     private fun advancedVehicleData(card: LinearLayout) {
+        if (nativeVehicleDataSupported()) {
+            nativeVehicleDataSettings(card)
+            return
+        }
         val legacyMode = BydOutputSettings.legacyVehicleProbe(this)
         card.addView(label(getString(R.string.advanced_vehicle_data_description), 14, MUTED)
             .apply { setPadding(0, dp(12), 0, 0) })

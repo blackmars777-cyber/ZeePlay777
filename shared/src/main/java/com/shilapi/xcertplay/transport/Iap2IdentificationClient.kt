@@ -55,6 +55,8 @@ data class Iap2IdentificationConfig(
     /** Declares an electric vehicle and answers the phone's vehicle-status subscription. */
     val vehicleStatusEnabled: Boolean = false,
     val vehicleStatusRangeEnabled: Boolean = true,
+    val vehicleStatusRangeWarningEnabled: Boolean = true,
+    val vehicleStatusMaxRangeEnabled: Boolean = true,
     /** The charging inlets declared with [vehicleStatusEnabled]. */
     val chargingConnectors: EvChargingConnectors = EvChargingConnectors.CCS2_TYPE2,
     /** Also offer wheel speed ($PASCD) in the location component; needs [locationInformationEnabled]. */
@@ -378,7 +380,8 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         void(5)
                     }
                 }
-                if (config.vehicleStatusEnabled) electricVehicleComponents(config.manufacturer, config.chargingConnectors, config.vehicleStatusRangeEnabled)
+                if (config.vehicleStatusEnabled) electricVehicleComponents(config.manufacturer, config.chargingConnectors, config.vehicleStatusRangeEnabled,
+                    config.vehicleStatusRangeWarningEnabled, config.vehicleStatusMaxRangeEnabled)
                 if (config.locationInformationEnabled) {
                     group(22) {
                         u16(0, 0)

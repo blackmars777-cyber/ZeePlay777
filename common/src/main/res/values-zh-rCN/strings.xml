@@ -1016,4 +1016,10 @@
     <string name="settings_cluster_speedometer_album_color_description">平滑过渡到专辑边框的颜色，并保留所选的不透明度。</string>
     <string name="settings_auto_car_hotspot_vehicle_description">打开或返回 DiPlay 时，以及无线连接前，尝试通过原厂服务开启车机热点。此服务无需 ADB 或“修改系统设置”权限，支持情况取决于车机固件。不会自动关闭热点。</string>
     <string name="settings_hotspot_vehicle_service_detected">已检测到原厂热点服务</string>
+    <string name="settings_native_vehicle_description">通过车机原生接口读取车速、挡位、电量和动态续航，无需 ADB。驻车视频仍需独立验证。</string>
+    <string name="settings_native_vehicle_battery_description">向 iPhone 提供实测电量和动态续航，下次连接生效。</string>
+    <string name="settings_native_vehicle_speed_description">启用位置共享后向 iPhone 提供车速和挡位，下次连接生效。</string>
+    <string name="settings_native_vehicle_permissions">申请车辆数据权限</string>
+    <string name="settings_native_vehicle_check">检查车辆数据</string>
+    <string name="settings_native_vehicle_title">极氪车辆数据（实验性）</string>
 </resources>

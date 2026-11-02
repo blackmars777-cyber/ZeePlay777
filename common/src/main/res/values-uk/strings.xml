@@ -968,4 +968,10 @@
     <string name="settings_cluster_speedometer_album_color_description">Плавно змінює тло на колір рамки альбому. Зберігає вибрану непрозорість.</string>
     <string name="settings_auto_car_hotspot_vehicle_description">Під час відкриття або повернення до DiPlay та перед бездротовим з’єднанням застосунок намагається ввімкнути точку доступу через службу автомобіля. Цій службі не потрібні ADB чи дозвіл змінювати системні налаштування. Підтримка залежить від прошивки. Точка доступу не вимикається автоматично.</string>
     <string name="settings_hotspot_vehicle_service_detected">Виявлено службу точки доступу автомобіля</string>
+    <string name="settings_native_vehicle_description">Читання швидкості, передачі, заряду й динамічного запасу ходу через інтерфейс автомобіля без ADB. Відео на стоянці потребує окремої перевірки.</string>
+    <string name="settings_native_vehicle_battery_description">Передавати виміряні заряд і динамічний запас ходу на iPhone. Застосовується під час наступного підключення.</string>
+    <string name="settings_native_vehicle_speed_description">Передавати швидкість і передачу за ввімкненої геопозиції. Застосовується під час наступного підключення.</string>
+    <string name="settings_native_vehicle_permissions">Запросити дозволи на дані автомобіля</string>
+    <string name="settings_native_vehicle_check">Перевірити дані автомобіля</string>
+    <string name="settings_native_vehicle_title">Дані автомобіля Zeekr (експериментально)</string>
 </resources>

@@ -1005,4 +1005,10 @@
     <string name="settings_cluster_speedometer_album_color_description">يطابق لون إطار الألبوم بانتقالات سلسة مع الحفاظ على التعتيم المحدد.</string>
     <string name="settings_auto_car_hotspot_vehicle_description">يحاول تشغيل نقطة اتصال السيارة عبر خدمة السيارة عند فتح DiPlay أو العودة إليه وقبل الاتصال اللاسلكي. لا تتطلب هذه الخدمة ADB أو إذن تعديل إعدادات النظام. يعتمد الدعم على برنامج السيارة. لا يتم إيقاف نقطة الاتصال تلقائيًا.</string>
     <string name="settings_hotspot_vehicle_service_detected">تم اكتشاف خدمة نقطة اتصال السيارة</string>
+    <string name="settings_native_vehicle_description">قراءة السرعة وناقل الحركة والشحن والمدى الديناميكي عبر واجهة السيارة دون ADB. يتطلب الفيديو أثناء الوقوف تحققًا منفصلًا.</string>
+    <string name="settings_native_vehicle_battery_description">إرسال الشحن والمدى الديناميكي المقاسين إلى iPhone. يسري عند الاتصال التالي.</string>
+    <string name="settings_native_vehicle_speed_description">إرسال سرعة السيارة ووضع ناقل الحركة عند تفعيل مشاركة الموقع. يسري عند الاتصال التالي.</string>
+    <string name="settings_native_vehicle_permissions">طلب أذونات بيانات السيارة</string>
+    <string name="settings_native_vehicle_check">فحص بيانات السيارة</string>
+    <string name="settings_native_vehicle_title">بيانات سيارة Zeekr (تجريبي)</string>
 </resources>

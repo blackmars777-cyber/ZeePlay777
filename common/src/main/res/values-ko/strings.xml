@@ -1052,4 +1052,10 @@
     <string name="last_connection_attempt">마지막 연결 시도(%1$s): %2$s</string>
     <string name="settings_auto_car_hotspot_vehicle_description">DiPlay를 열거나 돌아올 때, 무선 연결 전에 차량 서비스로 핫스팟 켜기를 시도합니다. 이 서비스에는 ADB나 시스템 설정 변경 권한이 필요하지 않습니다. 지원 여부는 차량 펌웨어에 따라 다릅니다. 핫스팟은 자동으로 꺼지지 않습니다.</string>
     <string name="settings_hotspot_vehicle_service_detected">차량 핫스팟 서비스 감지됨</string>
+    <string name="settings_native_vehicle_description">ADB 없이 차량 인터페이스에서 속도, 기어, 배터리 잔량과 동적 주행 가능 거리를 읽습니다. 주차 중 동영상은 별도 검증이 필요합니다.</string>
+    <string name="settings_native_vehicle_battery_description">측정한 배터리 잔량과 동적 주행 가능 거리를 iPhone에 전송합니다. 다음 연결부터 적용됩니다.</string>
+    <string name="settings_native_vehicle_speed_description">위치 공유가 켜져 있을 때 차량 속도와 기어를 전송합니다. 다음 연결부터 적용됩니다.</string>
+    <string name="settings_native_vehicle_permissions">차량 데이터 권한 요청</string>
+    <string name="settings_native_vehicle_check">차량 데이터 확인</string>
+    <string name="settings_native_vehicle_title">Zeekr 차량 데이터 (실험 기능)</string>
 </resources>

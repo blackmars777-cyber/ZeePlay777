@@ -47,6 +47,7 @@ jobs:
             common/build/reports/tests/
             common/build/reports/album-artwork-ui/
             common/build/reports/navigation-focus-ui/
+            common/build/reports/zeekr-vehicle-ui/
             mobile/build/reports/lint-results-debug.html
             samples/home/build/reports/tests/
             samples/home/build/reports/lint-results-debug.html

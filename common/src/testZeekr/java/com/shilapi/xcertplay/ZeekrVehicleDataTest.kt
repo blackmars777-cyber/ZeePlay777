@@ -114,6 +114,59 @@ class ZeekrVehicleDataTest {
         assertTrue(client.closed.await(4, TimeUnit.SECONDS))
     }
 
+    @Test fun observedFirmwareStatusAndIntegerRangeReachTheRealProvider() {
+        val clock = AtomicLong(50_000_000_000L)
+        val client = object : Client(clock) {
+            override fun read(id: Int) = ZeekrSensorValue(clock.get(), when(id) {
+                ZeekrVehicleData.GEAR -> 3
+                ZeekrVehicleData.SPEED -> 72f
+                ZeekrVehicleData.RANGE -> 277
+                else -> 53f
+            }, -1)
+        }
+        val source = ZeekrVehicleData(RuntimeEnvironment.getApplication(), clock::get) { _,_ -> client }
+        val speed = source.speed()
+        try {
+            speed.start()
+            await { source.battery.snapshot()?.rangeKm == 277 }
+            await { speed.drain()?.samples?.singleOrNull()?.metersPerSecond == 20.0 }
+            assertEquals(53.0, source.battery.snapshot()!!.batteryPercent, 0.0)
+            assertNull(source.parked())
+            client.lost = true
+            await { source.battery.snapshot() == null }
+        } finally { speed.stop(); source.close() }
+    }
+
+    @Test fun deniedChannelsDoNotEraseIndependentVehicleData() {
+        for (denied in listOf(ZeekrVehicleData.BATTERY, ZeekrVehicleData.SPEED)) {
+            val clock = AtomicLong(50_000_000_000L)
+            val client = object : Client(clock) {
+                override fun read(id: Int): ZeekrSensorValue {
+                    if (id == denied) throw SecurityException("channel denied")
+                    return ZeekrSensorValue(clock.get(), when(id) {
+                        ZeekrVehicleData.GEAR -> 3
+                        ZeekrVehicleData.SPEED -> 72f
+                        ZeekrVehicleData.RANGE -> 277
+                        else -> 53f
+                    }, -1)
+                }
+            }
+            val source = ZeekrVehicleData(RuntimeEnvironment.getApplication(), clock::get) { _,_ -> client }
+            val speed = source.speed()
+            try {
+                speed.start()
+                if (denied == ZeekrVehicleData.BATTERY) {
+                    await { speed.drain() != null }
+                    assertNull(source.battery.snapshot())
+                } else {
+                    await { source.battery.snapshot()?.rangeKm == 277 }
+                    assertNull(speed.drain())
+                    assertNull(source.parked())
+                }
+            } finally { speed.stop(); source.close() }
+        }
+    }
+
     internal open class Client(private val clock: AtomicLong) : ZeekrSensorClient {
         @Volatile override var lost = false
         @Volatile var availability = 0

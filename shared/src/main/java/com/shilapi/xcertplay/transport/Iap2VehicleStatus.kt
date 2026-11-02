@@ -18,6 +18,8 @@ data class VehicleStatusSnapshot(
     /** Percent-only sources omit unmeasured range and charging instead of fabricating zero/false. */
     val rangeAvailable: Boolean = true,
     val chargingAvailable: Boolean = true,
+    val rangeWarningAvailable: Boolean = true,
+    val maxRangeAvailable: Boolean = true,
 )
 
 /** Supplies the vehicle's status for CarPlay; null while no reading is available. */
@@ -39,7 +41,8 @@ enum class EvChargingConnectors(internal vararg val wireValues: Int) {
  */
 fun Iap2IdentificationConfig.withVehicleStatusFrom(provider: VehicleStatusProvider?): Iap2IdentificationConfig =
     if (!vehicleStatusEnabled) this else provider?.snapshot()?.let {
-        copy(vehicleStatusRangeEnabled = it.rangeAvailable)
+        copy(vehicleStatusRangeEnabled = it.rangeAvailable,
+            vehicleStatusRangeWarningEnabled = it.rangeWarningAvailable, vehicleStatusMaxRangeEnabled = it.maxRangeAvailable)
     } ?: copy(vehicleStatusEnabled = false)
 
 /**
@@ -57,7 +60,8 @@ object Iap2VehicleStatus {
     private const val ENGINE_TYPE_ELECTRIC = 2
 
     /** IdentificationInformation params 20 (VehicleInformation) and 21 (VehicleStatus). */
-    fun Iap2BodyBuilder.electricVehicleComponents(name: String, connectors: EvChargingConnectors, rangeEnabled: Boolean = true) {
+    fun Iap2BodyBuilder.electricVehicleComponents(name: String, connectors: EvChargingConnectors, rangeEnabled: Boolean = true,
+        rangeWarningEnabled: Boolean = true, maxRangeEnabled: Boolean = true) {
         group(20) {
             u16(0, 3) // Identifier
             string(1, name) // Name
@@ -71,21 +75,21 @@ object Iap2VehicleStatus {
             string(1, name) // Name
             if (rangeEnabled) {
                 void(3) // Range
-                void(6) // RangeWarning
+                if (rangeWarningEnabled) void(6) // RangeWarning
                 void(11) // RangeElectric
-                void(15) // RangeWarningElectric
+                if (rangeWarningEnabled) void(15) // RangeWarningElectric
             }
             void(21) // ElectricChargeInfo
-            if (rangeEnabled) void(30) // MaxRangeInfo
+            if (rangeEnabled && maxRangeEnabled) void(30) // MaxRangeInfo
         }
     }
 
     fun update(status: VehicleStatusSnapshot): Iap2Frame = Iap2Messages.buildRaw(VEHICLE_STATUS_UPDATE) {
         if (status.rangeAvailable) {
             u16(3, status.rangeKm.coerceIn(0, 0xffff)) // Range, km
-            bool(6, status.rangeWarning) // RangeWarning
+            if (status.rangeWarningAvailable) bool(6, status.rangeWarning) // RangeWarning
             u16(11, status.rangeKm.coerceIn(0, 0xffff)) // RangeElectric, km
-            bool(15, status.rangeWarning) // RangeWarningElectric
+            if (status.rangeWarningAvailable) bool(15, status.rangeWarning) // RangeWarningElectric
         }
         // Unknown energy is omitted, never represented as an empty battery or a zero capacity.
         if (status.currentChargeWh != null || status.maxChargeWh != null) u32(21, 0L) // MinBatteryCharge, Wh
@@ -93,7 +97,7 @@ object Iap2VehicleStatus {
         status.maxChargeWh?.let { u32(23, it.coerceAtLeast(0)) } // MaxBatteryCharge, Wh
         u32(24, (status.batteryPercent.coerceIn(0.0, 100.0) * 1000).roundToLong()) // DisplayedBatteryPercentage, % x 1000
         if (status.chargingAvailable) bool(25, status.charging) // isCharging
-        if (status.rangeAvailable) u16(30, status.maxRangeKm.coerceIn(0, 0xffff)) // MaxRangeElectric, km
+        if (status.rangeAvailable && status.maxRangeAvailable) u16(30, status.maxRangeKm.coerceIn(0, 0xffff)) // MaxRangeElectric, km
     }
 }
 

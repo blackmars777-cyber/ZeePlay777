@@ -1046,4 +1046,10 @@
     <string name="settings_cluster_speedometer_album_color_description">Abbina il colore della cornice dell’album con transizioni fluide. Mantiene l’opacità selezionata.</string>
     <string name="settings_auto_car_hotspot_vehicle_description">All’apertura o al ritorno a DiPlay e prima di una connessione wireless, tenta di attivare l’hotspot tramite il servizio dell’auto. Questo servizio non richiede ADB né l’accesso alla modifica delle impostazioni di sistema. Il supporto dipende dal firmware. L’hotspot non viene spento automaticamente.</string>
     <string name="settings_hotspot_vehicle_service_detected">Servizio hotspot dell’auto rilevato</string>
+    <string name="settings_native_vehicle_description">Leggi velocità, marcia, carica e autonomia dinamica tramite il veicolo senza ADB. I video in sosta richiedono una verifica separata.</string>
+    <string name="settings_native_vehicle_battery_description">Condividi carica e autonomia dinamica misurate con iPhone. Si applica alla prossima connessione.</string>
+    <string name="settings_native_vehicle_speed_description">Condividi velocità e marcia quando la posizione è condivisa. Si applica alla prossima connessione.</string>
+    <string name="settings_native_vehicle_permissions">Richiedi permessi per i dati del veicolo</string>
+    <string name="settings_native_vehicle_check">Controlla i dati del veicolo</string>
+    <string name="settings_native_vehicle_title">Dati veicolo Zeekr (sperimentale)</string>
 </resources>

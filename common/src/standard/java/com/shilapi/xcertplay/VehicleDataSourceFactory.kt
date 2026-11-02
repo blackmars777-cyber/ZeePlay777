@@ -4,3 +4,5 @@ import android.content.Context
 
 @Suppress("UNUSED_PARAMETER")
 internal fun createVehicleDataSource(context: Context): VehicleDataSource? = null
+
+internal fun nativeVehicleDataSupported(): Boolean = false

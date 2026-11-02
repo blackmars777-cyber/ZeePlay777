@@ -219,9 +219,10 @@ open class CarPlayHostActivity : ComponentActivity() {
             carPlayUsbInterfaceNumber = 3,
             locationInformationEnabled = locationReportingEnabled,
             vehicleStatusEnabled = batteryToIphoneEnabled(),
-            chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
+            chargingConnectors = if (vehicleData != null) com.shilapi.xcertplay.transport.EvChargingConnectors.GB_T
+                else com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
             vehicleSpeedEnabled = locationReportingEnabled &&
-                (vehicleData != null || com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) || EcarxWheelSpeed.present()),
+                ((vehicleData != null && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphone(this)) || com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) || EcarxWheelSpeed.present()),
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -861,6 +862,7 @@ open class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (batteryToIphoneEnabled() || parkedVideoEnabled()) vehicleData?.warmUp()
         if (CarPlayScreen.forwarded(this)) {
             forwarded = true
             return

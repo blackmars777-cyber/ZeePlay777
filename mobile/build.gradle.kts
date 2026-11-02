@@ -21,8 +21,8 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 24
         targetSdk = 37
-        versionCode = 41
-        versionName = "0.2.22" + editionConfig.getValue("versionNameSuffix")
+        versionCode = if (edition == "zeekr") 42 else 41
+        versionName = (if (edition == "zeekr") "0.2.23" else "0.2.22") + editionConfig.getValue("versionNameSuffix")
         if (edition == "zeekr") {
             manifestPlaceholders["editionApplicationLabel"] = editionConfig.getValue("applicationLabel")
         }

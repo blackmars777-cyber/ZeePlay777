@@ -1058,4 +1058,10 @@
     <string name="settings_cluster_speedometer_album_color_description">アルバムの枠の色に滑らかに切り替わります。選択した不透明度は維持されます。</string>
     <string name="settings_auto_car_hotspot_vehicle_description">DiPlay を開いたときや戻ったとき、無線接続の前に、車載サービスでホットスポットの起動を試みます。このサービスには ADB やシステム設定の変更権限は不要です。対応状況は車載機のファームウェアによって異なります。ホットスポットは自動でオフになりません。</string>
     <string name="settings_hotspot_vehicle_service_detected">車載ホットスポットサービスを検出しました</string>
+    <string name="settings_native_vehicle_description">ADBを使わず、車両インターフェースから車速、ギア、充電率、動的航続距離を読み取ります。駐車中動画には別途検証が必要です。</string>
+    <string name="settings_native_vehicle_battery_description">実測した充電率と動的航続距離をiPhoneに送信します。次回接続時に反映されます。</string>
+    <string name="settings_native_vehicle_speed_description">位置情報の共有が有効な場合に車速とギアを送信します。次回接続時に反映されます。</string>
+    <string name="settings_native_vehicle_permissions">車両データの権限を申請</string>
+    <string name="settings_native_vehicle_check">車両データを確認</string>
+    <string name="settings_native_vehicle_title">Zeekr車両データ（実験的機能）</string>
 </resources>

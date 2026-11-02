@@ -1059,4 +1059,10 @@
     <string name="settings_cluster_speedometer_album_color_description">Match the album frame color with smooth transitions. Keeps the selected opacity.</string>
     <string name="settings_auto_car_hotspot_vehicle_description">Uses the car\'s hotspot service when DiPlay opens or returns, and before a wireless connection. This service does not require ADB or Modify system settings access. Support depends on the car firmware. The hotspot is not turned off automatically.</string>
     <string name="settings_hotspot_vehicle_service_detected">Car hotspot service detected</string>
+    <string name="settings_native_vehicle_description">Read speed, gear, charge and dynamic range through the vehicle interface without ADB. Parked video needs separate validation.</string>
+    <string name="settings_native_vehicle_battery_description">Share measured charge and dynamic range with iPhone. Applies at the next connection.</string>
+    <string name="settings_native_vehicle_speed_description">Share vehicle speed and gear when location sharing is enabled. Applies at the next connection.</string>
+    <string name="settings_native_vehicle_permissions">Request vehicle data permissions</string>
+    <string name="settings_native_vehicle_check">Check vehicle data</string>
+    <string name="settings_native_vehicle_title">Zeekr vehicle data (experimental)</string>
 </resources>

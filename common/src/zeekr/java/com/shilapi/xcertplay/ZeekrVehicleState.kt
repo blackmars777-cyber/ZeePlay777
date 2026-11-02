@@ -5,7 +5,7 @@ import com.shilapi.xcertplay.transport.VehicleSpeedReading
 import com.shilapi.xcertplay.transport.VehicleSpeedSample
 import com.shilapi.xcertplay.transport.VehicleStatusSnapshot
 
-/** Raw SDK event. Missing availability is unknown, never implicitly AVAILABLE. */
+/** Raw SDK event; -1 is a verified-profile read fallback, never evidence for parked video. */
 internal data class ZeekrSensorValue(val timestampNs: Long, val value: Number?, val availability: Int?)
 
 /** Separates last-change timestamps from successful reads and invalidates every connection epoch. */
@@ -18,6 +18,8 @@ internal class ZeekrVehicleState {
     private var gear: VehicleGear? = null
     private var kmh: Double? = null
     private var percent: Double? = null
+    private var rangeKm: Int? = null
+    private var parkInputsAvailable = false
     private var availability = "unread"
     private val samples = ArrayList<VehicleSpeedSample>()
 
@@ -28,9 +30,9 @@ internal class ZeekrVehicleState {
     @Synchronized fun clearSamples() = samples.clear()
 
     @Synchronized fun publish(ticket: Long, speed: ZeekrSensorValue?, shift: ZeekrSensorValue?,
-        battery: ZeekrSensorValue?, nowNs: Long, collectSpeed: Boolean) {
+        battery: ZeekrSensorValue?, nowNs: Long, collectSpeed: Boolean, range: ZeekrSensorValue? = null) {
         if (epoch != ticket || !connected) return
-        fun valid(value: ZeekrSensorValue?): Boolean = value != null && value.availability == 0 &&
+        fun valid(value: ZeekrSensorValue?): Boolean = value != null && (value.availability == 0 || value.availability == -1) &&
             value.timestampNs > 0 && value.timestampNs <= nowNs && value.value?.toDouble()?.isFinite() == true
         val nextGear = shift?.takeIf(::valid)?.value?.toDouble()?.let { raw ->
             if (raw != raw.toInt().toDouble()) null else when (raw.toInt()) {
@@ -46,11 +48,13 @@ internal class ZeekrVehicleState {
         gearEventNs = if (nextGear != null) shift!!.timestampNs else 0L
         kmh = speed?.takeIf(::valid)?.value?.toDouble()?.takeIf { it in 0.0..250.0 }
         percent = battery?.takeIf(::valid)?.value?.toDouble()?.takeIf { it in 0.0..100.0 }
-        availability = "speed=${speed?.availability},gear=${shift?.availability},battery=${battery?.availability}"
+        rangeKm = range?.takeIf(::valid)?.value?.toDouble()?.takeIf { it in 0.0..3000.0 && it == it.toInt().toDouble() }?.toInt()
+        parkInputsAvailable = speed?.availability == 0 && shift?.availability == 0
+        availability = "range=${range?.availability},speed=${speed?.availability},gear=${shift?.availability},battery=${battery?.availability}"
         readAtNs = nowNs
         // Old moving-speed cache entries must not be re-stamped as new measurements. Zero can be
         // on-change and stay cached at a red light, but only on a healthy, freshly read connection.
-        val usableSpeed = kmh?.takeIf { it == 0.0 || nowNs - speed!!.timestampNs <= MOVING_SPEED_AGE_NS }
+        val usableSpeed = kmh?.takeIf { (it == 0.0 && speed!!.availability == 0) || nowNs - speed!!.timestampNs <= MOVING_SPEED_AGE_NS }
         if (collectSpeed && gear != null && usableSpeed != null) {
             if (samples.size == 40) samples.removeAt(0)
             samples += VehicleSpeedSample(nowNs / 1_000_000, usableSpeed / 3.6)
@@ -63,24 +67,25 @@ internal class ZeekrVehicleState {
     }
 
     @Synchronized fun parked(nowNs: Long): Boolean? {
-        if (!healthy(nowNs) || gear == null) return null
+        if (!healthy(nowNs) || gear == null || !parkInputsAvailable) return null
         if (gear != VehicleGear.PARK) return false
         if (gearEventNs < epochStartedAt) return null // Cached P from before bind/wake is not new park evidence.
         return kmh?.let { it == 0.0 }
     }
 
     @Synchronized fun battery(nowNs: Long): VehicleStatusSnapshot? = percent?.takeIf { healthy(nowNs) }?.let {
-        VehicleStatusSnapshot(rangeKm = 0, rangeWarning = false, batteryPercent = it,
+        VehicleStatusSnapshot(rangeKm = rangeKm ?: 0, rangeWarning = false, batteryPercent = it,
             currentChargeWh = null, maxChargeWh = null, maxRangeKm = 0,
-            rangeAvailable = false, chargingAvailable = false)
+            rangeAvailable = rangeKm != null, chargingAvailable = false,
+            rangeWarningAvailable = false, maxRangeAvailable = false)
     }
 
     @Synchronized fun status(): String = "Zeekr CarSensor connected=$connected gear=${gear?.letter ?: "unknown"}" +
-        " speedKmh=$kmh batteryPercent=$percent availability=[$availability] parkEventAfterConnect=${gearEventNs>=epochStartedAt}"
+        " speedKmh=$kmh batteryPercent=$percent rangeKm=$rangeKm parkInputsAvailable=$parkInputsAvailable availability=[$availability] parkEventAfterConnect=${gearEventNs>=epochStartedAt}"
 
     private fun healthy(nowNs: Long) = connected && readAtNs >= 0 && nowNs >= readAtNs &&
         nowNs - readAtNs <= READ_HEALTH_NS
-    private fun clear() { connected = false; readAtNs = -1; gear = null; kmh = null; percent = null; samples.clear() }
+    private fun clear() { connected = false; readAtNs = -1; gear = null; kmh = null; percent = null; rangeKm = null; parkInputsAvailable = false; samples.clear() }
 
     companion object {
         const val READ_HEALTH_NS = 1_500_000_000L
