@@ -243,6 +243,7 @@ class WheelSiriWindowTest {
     }
 
     @Test fun siriZoomAndJoystickShowTheirSharedServiceSetupOnlyOnce() {
+        org.junit.Assume.assumeFalse("BYD joystick controls are excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         settings.setTheme(android.R.style.Theme_Material_NoActionBar)
         WheelZoomSettings.setEnabled(settings, true)
         WheelZoomSettings.setJoystick(settings, true)
@@ -296,6 +297,7 @@ class WheelSiriWindowTest {
     }
 
     @Test fun nonBydUnitKeepsItsSavedJoystickControlsWithoutOfferingUnavailableMapZoom() {
+        org.junit.Assume.assumeFalse("BYD joystick controls are excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         settings.setTheme(android.R.style.Theme_Material_NoActionBar)
         WheelZoomSettings.setSiriKey(settings, false)
         WheelZoomSettings.setJoystick(settings, true)
@@ -453,6 +455,7 @@ class WheelSiriWindowTest {
     }
 
     @Test fun withoutTheServiceSiriStillLearnsHereAndOtherRolesSayTheServiceIsOff() {
+        org.junit.Assume.assumeFalse("BYD joystick controls are excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         settings.setTheme(android.R.style.Theme_Material_NoActionBar)
         WheelZoomSettings.setJoystick(settings, true)
         val siri = WheelZoomSettings.Role.SIRI
@@ -476,6 +479,7 @@ class WheelSiriWindowTest {
     }
 
     @Test fun otherRolesStillLearnOnlyThroughTheService() {
+        org.junit.Assume.assumeFalse("BYD joystick controls are excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         settings.setTheme(android.R.style.Theme_Material_NoActionBar)
         WheelZoomSettings.setJoystick(settings, true)
         val joystick = WheelZoomSettings.Role.JOYSTICK
@@ -498,6 +502,7 @@ class WheelSiriWindowTest {
     }
 
     @Test fun nonBydUnitWithThePreviouslySupportedClusterDisplayKeepsWheelControls() {
+        org.junit.Assume.assumeFalse("BYD joystick controls are excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         settings.setTheme(android.R.style.Theme_Material_NoActionBar)
         WheelZoomSettings.setSiriKey(settings, false)
         AirPlayPersistence.saveClusterMapEnabled(settings, true)

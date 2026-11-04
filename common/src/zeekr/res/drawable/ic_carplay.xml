@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The supplied artwork is retained byte-for-byte in its density-qualified source. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/zeeplay_icon"
+    android:gravity="fill" />

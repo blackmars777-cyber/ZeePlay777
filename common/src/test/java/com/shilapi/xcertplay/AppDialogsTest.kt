@@ -71,8 +71,8 @@ class AppDialogsTest {
             intArrayOf(android.R.attr.colorAccent, android.R.attr.windowBackground),
         )
         try {
-            assertEquals(palette.accent, attributes.getColor(0, 0))
-            assertEquals(palette.surface, (attributes.getDrawable(1) as ColorDrawable).color)
+            assertEquals(palette.forEdition().accent, attributes.getColor(0, 0))
+            assertEquals(palette.forEdition().surface, (attributes.getDrawable(1) as ColorDrawable).color)
         } finally {
             attributes.recycle()
         }

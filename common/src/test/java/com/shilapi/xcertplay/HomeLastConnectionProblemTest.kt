@@ -78,14 +78,14 @@ class HomeLastConnectionProblemTest {
     @Test fun homeSaysWhatTheLastAttemptRanInto() {
         fail(ConnectionFailureCause.CHOSEN_IPHONE_NOT_PAIRED)
         val shown = shown(openHome())
-        val line = Regex("Last connection attempt \\($time\\): The iPhone chosen in DiPlay is no longer paired with the car")
+        val line = Regex("Last connection attempt \\($time\\): The iPhone chosen in ${Regex.escape(context.getString(R.string.diplay))} is no longer paired with the car")
         assertEquals(shown.toString(), 1, shown.count(line::matches))
     }
 
     @Test @Config(qualifiers = "zh-rTW-w1000dp-h700dp-land") fun homeSaysItInTraditionalChinese() {
         fail(ConnectionFailureCause.CHOSEN_IPHONE_NOT_PAIRED)
         val shown = shown(openHome())
-        val line = Regex("上次連線嘗試（$time）：在 DiPlay 選擇的 iPhone 已不再與車機配對")
+        val line = Regex("上次連線嘗試（$time）：在 ${Regex.escape(context.getString(R.string.diplay))} 選擇的 iPhone 已不再與車機配對")
         assertEquals(shown.toString(), 1, shown.count(line::matches))
     }
 
@@ -120,7 +120,7 @@ class HomeLastConnectionProblemTest {
     @Test @Config(qualifiers = "zh-rTW") fun theReportSaysTheLastProblemInEnglishOnItsSecondLine() {
         fail(ConnectionFailureCause.CAR_HOTSPOT_OFF)
         val lines = reportLines()
-        assertTrue(lines[0], lines[0].startsWith("DiPlay ") && lines[0].endsWith(" · private beta diagnostic report"))
+        assertTrue(lines[0], lines[0].startsWith("${context.getString(R.string.diplay)} ") && lines[0].endsWith(" · private beta diagnostic report"))
         assertTrue(lines[1], lines[1].matches(Regex(
             "Last problem: Car hotspot is off \\(cause:CAR_HOTSPOT_OFF\\) at \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} [+-]\\d{4}")))
         assertTrue(lines[2], lines[2].startsWith("Android "))

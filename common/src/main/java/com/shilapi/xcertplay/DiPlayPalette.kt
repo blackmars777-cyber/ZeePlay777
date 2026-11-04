@@ -96,3 +96,8 @@ internal data class DiPlayPalette(
         )
     }
 }
+
+/** Edition branding never changes the projected CarPlay content or the standard edition. */
+internal fun DiPlayPalette.forEdition(): DiPlayPalette =
+    if (!com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR) this
+    else if (systemBarIconsAreDark) ZeekrHmiTokens.light else ZeekrHmiTokens.dark

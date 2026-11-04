@@ -1,0 +1,256 @@
+{
+  "$description": "ZeePlay app-owned OS 7.2-inspired tokens, supplied non-official HMI guide v1.1. Geometry is dp, typography sp; original home layout is retained.",
+  "color": {
+    "light": {
+      "background": {
+        "$type": "color",
+        "$value": "#F1F0F2"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#F8F8F9"
+      },
+      "control": {
+        "$type": "color",
+        "$value": "#EAEBED"
+      },
+      "textPrimary": {
+        "$type": "color",
+        "$value": "#191B1F"
+      },
+      "textSecondary": {
+        "$type": "color",
+        "$value": "#676B73"
+      },
+      "divider": {
+        "$type": "color",
+        "$value": "#E2E3E6"
+      },
+      "accent": {
+        "$type": "color",
+        "$value": "#414244"
+      },
+      "onAccent": {
+        "$type": "color",
+        "$value": "#FFFFFF"
+      },
+      "accentBackground": {
+        "$type": "color",
+        "$value": "#E4E5E7"
+      },
+      "success": {
+        "$type": "color",
+        "$value": "#1D7859"
+      },
+      "warning": {
+        "$type": "color",
+        "$value": "#A95411"
+      },
+      "danger": {
+        "$type": "color",
+        "$value": "#BD493B"
+      },
+      "focusRing": {
+        "$type": "color",
+        "$value": "#DA681C"
+      },
+      "warningBackground": {
+        "$type": "color",
+        "$value": "#FFF0E1"
+      }
+    },
+    "dark": {
+      "background": {
+        "$type": "color",
+        "$value": "#111316"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#222428"
+      },
+      "control": {
+        "$type": "color",
+        "$value": "#303236"
+      },
+      "textPrimary": {
+        "$type": "color",
+        "$value": "#F4F4F5"
+      },
+      "textSecondary": {
+        "$type": "color",
+        "$value": "#A9ABB2"
+      },
+      "divider": {
+        "$type": "color",
+        "$value": "#3A3D42"
+      },
+      "accent": {
+        "$type": "color",
+        "$value": "#E5E6E8"
+      },
+      "onAccent": {
+        "$type": "color",
+        "$value": "#17191D"
+      },
+      "accentBackground": {
+        "$type": "color",
+        "$value": "#303236"
+      },
+      "success": {
+        "$type": "color",
+        "$value": "#5EBE93"
+      },
+      "warning": {
+        "$type": "color",
+        "$value": "#FFB06D"
+      },
+      "danger": {
+        "$type": "color",
+        "$value": "#F37C6D"
+      },
+      "focusRing": {
+        "$type": "color",
+        "$value": "#F08A43"
+      },
+      "warningBackground": {
+        "$type": "color",
+        "$value": "#3C2B21"
+      }
+    }
+  },
+  "dimension": {
+    "cardRadius": {
+      "$type": "dimension",
+      "$value": {
+        "value": 20,
+        "unit": "dp"
+      }
+    },
+    "buttonRadius": {
+      "$type": "dimension",
+      "$value": {
+        "value": 14,
+        "unit": "dp"
+      }
+    },
+    "cardPadding": {
+      "$type": "dimension",
+      "$value": {
+        "value": 24,
+        "unit": "dp"
+      }
+    },
+    "blockGap": {
+      "$type": "dimension",
+      "$value": {
+        "value": 16,
+        "unit": "dp"
+      }
+    },
+    "icon": {
+      "$type": "dimension",
+      "$value": {
+        "value": 28,
+        "unit": "dp"
+      }
+    },
+    "feedbackIcon": {
+      "$type": "dimension",
+      "$value": {
+        "value": 32,
+        "unit": "dp"
+      }
+    },
+    "minTouchHeight": {
+      "$type": "dimension",
+      "$value": {
+        "value": 60,
+        "unit": "dp"
+      }
+    },
+    "railWidth": {
+      "$type": "dimension",
+      "$value": {
+        "value": 192,
+        "unit": "dp"
+      }
+    },
+    "homeColumnsGap": {
+      "$type": "dimension",
+      "$value": {
+        "value": 20,
+        "unit": "dp"
+      }
+    },
+    "noticeRadius": {
+      "$type": "dimension",
+      "$value": {
+        "value": 14,
+        "unit": "dp"
+      }
+    },
+    "headerLabelMinWidth": {
+      "$type": "dimension",
+      "$value": {
+        "value": 360,
+        "unit": "dp"
+      }
+    },
+    "controlVerticalInset": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "dp"
+      }
+    },
+    "pageInsetCompact": {
+      "$type": "dimension",
+      "$value": {
+        "value": 12,
+        "unit": "dp"
+      }
+    },
+    "pageInsetFull": {
+      "$type": "dimension",
+      "$value": {
+        "value": 32,
+        "unit": "dp"
+      }
+    },
+    "inlineActionMaxWidth": {
+      "$type": "dimension",
+      "$value": {
+        "value": 240,
+        "unit": "dp"
+      }
+    },
+    "qrMaxSide": {
+      "$type": "dimension",
+      "$value": {
+        "value": 240,
+        "unit": "dp"
+      }
+    },
+    "qrFrameInset": {
+      "$type": "dimension",
+      "$value": {
+        "value": 12,
+        "unit": "dp"
+      }
+    }
+  },
+  "typography": {
+    "family": "sans-serif",
+    "pageTitleSp": 24,
+    "compactTitleSp": 24,
+    "sectionTitleSp": 18,
+    "connectionStatusSp": 28,
+    "bodySp": 18,
+    "descriptionSp": 16
+  },
+  "motion": {
+    "pageFadeMs": 180,
+    "easing": "ease-out",
+    "respectSystemAnimationScale": true
+  }
+}

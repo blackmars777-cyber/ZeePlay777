@@ -225,7 +225,7 @@ internal class ReflectiveZeekrSensorClient(context: Context, private val disconn
             when (method.name) {
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === args?.firstOrNull()
-                "toString" -> "KrPlayReadOnlyVehicleObserver"
+                "toString" -> "ZeekrReadOnlyVehicleObserver"
                 else -> null // SDK owns the cache; the worker reads it without blocking iAP2/UI.
             }
         }

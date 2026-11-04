@@ -99,7 +99,7 @@ class ZeekrMediaProtocolTest {
         assertEquals(0, intCall(info, ZeekrMediaProtocol.INFO, 11))
         assertEquals(2400L, ZeekrMediaProtocol.call(info, ZeekrMediaProtocol.INFO, 42) { it.readLong() })
         for (code in listOf(20, 22, 28, 48)) assertEquals(0, intCall(info, ZeekrMediaProtocol.INFO, code))
-        assertEquals("Zeekr", ZeekrMediaProtocol.call(info, ZeekrMediaProtocol.INFO, 25) { it.readString() })
+        assertEquals("ZeePlay", ZeekrMediaProtocol.call(info, ZeekrMediaProtocol.INFO, 25) { it.readString() })
         assertEquals("diplay", ZeekrMediaProtocol.call(info, ZeekrMediaProtocol.INFO, 27) { it.readString() })
         val response = Parcel.obtain()
         val request = Parcel.obtain()

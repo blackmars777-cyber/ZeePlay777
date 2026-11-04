@@ -1050,4 +1050,13 @@
     <string name="settings_native_vehicle_permissions">Araç verisi izinlerini iste</string>
     <string name="settings_native_vehicle_check">Araç verilerini kontrol et</string>
     <string name="settings_native_vehicle_title">Zeekr araç verileri (deneysel)</string>
+    <string name="settings_zeekr_interaction">Araç entegrasyonu</string>
+    <string name="settings_zeekr_media">Medya merkezi</string>
+    <string name="settings_zeekr_media_description">Şarkı, kapak ve ilerlemeyi eşitler. Sonraki bağlantıda uygulanır.</string>
+    <string name="settings_zeekr_auto_select">Otomatik kaynak seçimi</string>
+    <string name="settings_zeekr_auto_select_description">Müzik başladığında CarPlay’e geçer. Sonraki bağlantıda uygulanır.</string>
+    <string name="settings_zeekr_controls">Oynatma kontrolleri</string>
+    <string name="settings_zeekr_controls_description">Uyumlu araç tuşlarıyla müziği kontrol edin. Sonraki bağlantıda uygulanır.</string>
+    <string name="settings_zeekr_gesture_hint">Araç sistemiyle çakışmayan bir hareket seçin.</string>
+    <string name="settings_zeekr_window_hint">Uyumlu ana ekran kartları ve bölünmüş ekran için CarPlay’i uygulama penceresinde açar. CarPlay sonraki açılışında uygulanır.</string>
 </resources>

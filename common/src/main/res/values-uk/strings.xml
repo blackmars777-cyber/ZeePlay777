@@ -974,4 +974,13 @@
     <string name="settings_native_vehicle_permissions">Запросити дозволи на дані автомобіля</string>
     <string name="settings_native_vehicle_check">Перевірити дані автомобіля</string>
     <string name="settings_native_vehicle_title">Дані автомобіля Zeekr (експериментально)</string>
+    <string name="settings_zeekr_interaction">Інтеграція з автомобілем</string>
+    <string name="settings_zeekr_media">Медіацентр</string>
+    <string name="settings_zeekr_media_description">Синхронізує музику, обкладинки й перебіг відтворення. Під час наступного підключення.</string>
+    <string name="settings_zeekr_auto_select">Автовибір джерела</string>
+    <string name="settings_zeekr_auto_select_description">Вмикає CarPlay на початку музики. Під час наступного підключення.</string>
+    <string name="settings_zeekr_controls">Керування музикою</string>
+    <string name="settings_zeekr_controls_description">Керування сумісними кнопками автомобіля. Під час наступного підключення.</string>
+    <string name="settings_zeekr_gesture_hint">Виберіть жест, який не конфліктує із системою автомобіля.</string>
+    <string name="settings_zeekr_window_hint">Відкриває CarPlay у вікні застосунку для сумісних карток і розділеного екрана. Застосовується під час наступного запуску CarPlay.</string>
 </resources>

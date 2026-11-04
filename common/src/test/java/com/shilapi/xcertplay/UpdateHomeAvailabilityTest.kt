@@ -37,7 +37,7 @@ class UpdateHomeAvailabilityTest {
 
         assertTrue(update.isClickable)
         assertTrue(update.isFocusable)
-        assertEquals(DiPlayPalette.DARK.warning, update.currentTextColor)
+        assertEquals(DiPlayPalette.DARK.forEdition().warning, update.currentTextColor)
         update.performClick()
 
         assertEquals(SettingsCategory.ABOUT, ReflectionHelpers.getField<SettingsCategory>(activity, "settingsCategory"))

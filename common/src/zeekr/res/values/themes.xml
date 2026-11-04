@@ -1,0 +1,14 @@
+<resources>
+    <color name="zeekr_dialog_background_dark">#222428</color>
+    <color name="zeekr_dialog_background_light">#F8F8F9</color>
+    <style name="Theme.Xcertplay.Dialog.Dark" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#E5E6E8</item>
+        <item name="android:windowBackground">@color/zeekr_dialog_background_dark</item>
+    </style>
+    <style name="Theme.Xcertplay.Dialog.Light" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#414244</item>
+        <item name="android:windowBackground">@color/zeekr_dialog_background_light</item>
+    </style>
+</resources>

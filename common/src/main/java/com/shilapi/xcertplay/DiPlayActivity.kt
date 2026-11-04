@@ -67,6 +67,7 @@ import com.shilapi.xcertplay.hud.BydVehicleField
 import com.shilapi.xcertplay.hud.BydVehicleFieldStore
 import com.shilapi.xcertplay.hud.BydVehicleProbeOutcome
 import com.shilapi.xcertplay.host.R
+import com.shilapi.xcertplay.host.BuildConfig
 import com.shilapi.xcertplay.media.AmbientColorMode
 import com.shilapi.xcertplay.media.AmbientColorSpeed
 import com.shilapi.xcertplay.media.AmbientIdleBehavior
@@ -114,6 +115,7 @@ internal enum class SettingsCategory {
 internal enum class SettingsSection {
     CARPLAY_CONTROLS,
     WHEEL_KEYS,
+    ZEEKR_INTERACTION,
     CONNECTION_SETUP,
     DIAGNOSTICS,
     AUTOMATIC_CONNECTION,
@@ -152,6 +154,7 @@ internal object SettingsInformationArchitecture {
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
             SettingsSection.WHEEL_KEYS,
+            SettingsSection.ZEEKR_INTERACTION,
             SettingsSection.CAR_BUTTON,
         ),
         SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
@@ -171,7 +174,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val handler = Handler(Looper.getMainLooper())
     private var appNight = true
     override val currentAppNight: Boolean get() = appNight
-    private var palette = DiPlayPalette.DARK
+    private var palette = DiPlayPalette.DARK.forEdition()
     private var appearanceObserverRemoval: (() -> Unit)? = null
     private var appearanceUpdatesResumed = false
     private var appearanceRenderPending = false
@@ -195,6 +198,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var setupError: String? = null
     private var status: TextView? = null
     private var homeCardTitle: TextView? = null
+    private var zeekrFeedback: ZeekrConnectionFeedback? = null
     private var homeConnectionHint: TextView? = null
     private var homeLastProblem: TextView? = null
     private var connectButton: Button? = null
@@ -686,6 +690,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             (settingsSearchExpanded && settingsSearchBox?.hasFocus() == true)
         settingsSearchBox = null
         if (page != "settings") clearSettingsSearchState()
+        zeekrFeedback = null
         status = null; homeLastProblem = null; connectButton = null; disconnectButton = null; lastRunning = null; carButtonCard = null
         reconnectBar = null
         readinessCard = null
@@ -697,7 +702,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             "settings" -> !SettingsLayoutPreferences.isActive(this)
             else -> true
         }
-        val scroll = ScrollView(this).apply { setBackgroundColor(BG); isFillViewport = true; clipToPadding = false }
+        val scroll = ScrollView(this).apply { setBackgroundColor(BG); isFillViewport = true; clipToPadding = false; isVerticalScrollBarEnabled = !BuildConfig.IS_ZEEKR }
         rootScroll = scroll
         val content = column()
         scroll.addView(content)
@@ -707,8 +712,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             settingsCategoryContent(content)
             expandedSettingsShell(header, scroll)
         } else {
-            if (compact) content.setPadding(dp(12), dp(10), dp(12), dp(12))
-            else content.setPadding(dp(32), dp(24), dp(32), dp(32))
+            val horizontalInset = if (BuildConfig.IS_ZEEKR) {
+                if (compact) ZeekrHmiTokens.PAGE_INSET_COMPACT_DP else ZeekrHmiTokens.PAGE_INSET_FULL_DP
+            } else if (compact) 12 else 32
+            if (compact) content.setPadding(dp(horizontalInset), dp(10), dp(horizontalInset), dp(12))
+            else content.setPadding(dp(horizontalInset), dp(24), dp(horizontalInset), dp(32))
             content.addView(header)
             content.addView(space(when {
                 compact && (page == "settings" || page == "home") -> SETTINGS_BLOCK_GAP_DP
@@ -743,6 +751,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             insets
         }
         setContentView(root)
+        if (BuildConfig.IS_ZEEKR && !sameDestination && !appearanceOnly && renderedPage != null &&
+            Build.VERSION.SDK_INT >= 26 && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            // One restrained content transition; system animation scale 0 disables it completely.
+            scroll.alpha = 0f
+            scroll.animate().alpha(1f).setDuration(ZeekrHmiTokens.PAGE_FADE_MS)
+                .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        }
         ViewCompat.requestApplyInsets(root)
         renderedPage = page
         renderedSettingsCategory = settingsCategory.takeIf { page == "settings" }
@@ -794,20 +809,27 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val logoSize = dp(if (compact) 30 else 36)
         addView(ImageView(this@DiPlayActivity).apply {
             setImageResource(R.drawable.ic_carplay)
-            contentDescription = getString(R.string.carplay)
+            contentDescription = getString(if (BuildConfig.IS_ZEEKR) R.string.diplay else R.string.carplay)
         }, LinearLayout.LayoutParams(logoSize, logoSize))
-        addView(label(getString(R.string.diplay), if (compact) 20 else 26, TEXT, true,
+        addView(label(if (BuildConfig.IS_ZEEKR && page != "home") BuildConfig.EDITION_APPLICATION_LABEL else getString(R.string.diplay), if (compact) 20 else 26, TEXT, true,
             centreGlyphs = resources.configuration.locales[0].language != "zh").apply {
             setPadding(if (compact) dp(8) else dp(12), 0, 0, 0)
         }, LinearLayout.LayoutParams(0, if (compact) dp(44) else dp(52), 1f))
         addView(appearanceButton(), LinearLayout.LayoutParams(dp(if (compact) 44 else 52), dp(if (compact) 44 else 52)).apply {
             marginEnd = dp(if (compact) 8 else 12)
         })
-        addView(headerButton(if (page == "home") getString(R.string.car_home) else getString(R.string.back),
-            if (page == "home") R.drawable.ic_dp_car else R.drawable.ic_dp_back, compact) {
+        val compactIconOnly = BuildConfig.IS_ZEEKR && compact &&
+            resources.configuration.screenWidthDp / resources.configuration.fontScale < ZeekrHmiTokens.HEADER_LABEL_MIN_WIDTH_DP
+        val destinationTitle = if (page == "home") getString(R.string.car_home) else getString(R.string.back)
+        val destinationIcon = if (page == "home") R.drawable.ic_dp_car else R.drawable.ic_dp_back
+        val destinationAction = {
             if (page == "home") startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
             else navigateBack()
-        }, LinearLayout.LayoutParams(-2, if (compact) dp(44) else dp(52)))
+        }
+        if (compactIconOnly) addView(iconButton(destinationIcon, destinationTitle, destinationAction),
+            LinearLayout.LayoutParams(dp(44), dp(44)))
+        else addView(headerButton(destinationTitle, destinationIcon, compact, destinationAction),
+            LinearLayout.LayoutParams(-2, if (compact) dp(44) else dp(52)))
     }
 
     private fun navigateBack() {
@@ -852,11 +874,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun settingsHeader(compact: Boolean): LinearLayout = row().apply {
         val controlHeight = dp(if (compact) 44 else 52)
-        val iconOnlySearch = compact || resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        val iconOnlySearch = BuildConfig.IS_ZEEKR || compact || resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         gravity = Gravity.CENTER_VERTICAL
         addView(headerButton(getString(R.string.back), R.drawable.ic_dp_back, compact, ::navigateBack),
             LinearLayout.LayoutParams(-2, if (compact) dp(44) else dp(52)))
-        val settingsTitle = label(getString(R.string.settings), if (compact) 20 else 26, TEXT, true,
+        val settingsTitle = label(getString(R.string.settings), if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.HEADER_TITLE_SP else if (compact) 20 else 26, TEXT, true,
             centreGlyphs = true).apply {
             setPadding(dp(12), 0, dp(12), 0)
             setSingleLine(true)
@@ -932,20 +954,26 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val body = column()
         val left = column()
         if (!compact) {
-            left.addView(label(getString(R.string.your_phone_your_drive), 12, ACCENT, true).apply { letterSpacing = .16f })
-            left.addView(label(getString(R.string.a_familiar_drive), if (wide) 42 else 36, TEXT, true).apply { setPadding(0, dp(12), 0, dp(10)) })
+            left.addView(label(if (BuildConfig.IS_ZEEKR) "${BuildConfig.EDITION_APPLICATION_LABEL} / ZEEKR" else getString(R.string.your_phone_your_drive), 12,
+                if (BuildConfig.IS_ZEEKR) MUTED else ACCENT, true).apply { letterSpacing = if (BuildConfig.IS_ZEEKR) .04f else .16f })
+            left.addView(label(getString(R.string.a_familiar_drive), if (BuildConfig.IS_ZEEKR) 36 else if (wide) 42 else 36, TEXT, true).apply { setPadding(0, dp(12), 0, dp(10)) })
             left.addView(label(getString(R.string.your_maps_music_and_conversations_carplay_right_here_on_yo), 19, MUTED))
         }
         val card = card()
-        homeCardTitle = label(getString(R.string.wireless_carplay), 12, ACCENT, true).apply { letterSpacing = .12f }
+        homeCardTitle = label(getString(R.string.wireless_carplay), 12, if (BuildConfig.IS_ZEEKR) MUTED else ACCENT, true).apply { letterSpacing = if (BuildConfig.IS_ZEEKR) .02f else .12f }
         card.addView(homeCardTitle)
-        status = label(getString(R.string.ready_when_you_are), 24, TEXT, true).apply { setPadding(0, dp(10), 0, dp(16)) }
-        card.addView(status)
+        if (BuildConfig.IS_ZEEKR) {
+            zeekrFeedback = ZeekrConnectionFeedback(this, palette).also(card::addView)
+            status = zeekrFeedback?.title
+        } else {
+            status = label(getString(R.string.ready_when_you_are), 24, TEXT, true).apply { setPadding(0, dp(10), 0, dp(16)) }
+            card.addView(status)
+        }
         connectButton = homeButton(getString(R.string.connect_phone), true) {
             if (CarPlayBackgroundSession.hasSession()) openProjection()
             else connect(true)
         }
-        card.addView(connectButton, matchButton(height = if (compact) 54 else 68))
+        card.addView(connectButton, matchButton(height = if (BuildConfig.IS_ZEEKR && compact) ZeekrHmiTokens.MIN_TOUCH_DP else if (compact) 54 else 68))
         val connectionHint = when (AirPlayPersistence.loadWirelessHotspotMode(this)) {
             WirelessHotspotMode.EXISTING_WIFI -> getString(R.string.existing_wifi_hint)
             WirelessHotspotMode.MANUAL -> getString(R.string.hotspot_hint_manual)
@@ -966,39 +994,47 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 !CarHotspotTethering.vehicleServiceAvailable(this)
             card.addView(label(if (allowOnSystemScreen) getString(R.string.settings_write_settings_missing)
                 else hotspotResultText(startupProblem), 15, WARNING))
-            if (!compact) card.addView(
+            if (!compact || BuildConfig.IS_ZEEKR) card.addView(
                 if (allowOnSystemScreen) homeButton(getString(R.string.settings_write_settings_allow), false) { openWriteSettingsAccess() }
                 else homeButton(getString(R.string.open_car_hotspot_settings), false) { openCarWifiSettings() },
-                matchButton(CONTROL_GAP_DP, 56))
+                matchButton(CONTROL_GAP_DP, if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.MIN_TOUCH_DP else 56))
         } else if (carHotspotOff()) {
             // No name is saved before Connection setup, and the sentence that quotes it would show “”.
             val name = AirPlayPersistence.loadManualHotspotSsid(this)
             val off = if (name.isBlank()) getString(R.string.hotspot_details_off) else getString(R.string.msg_car_hotspot_off, name)
             card.addView(label(off, 15, WARNING).apply { setPadding(0, dp(14), 0, 0) })
-            if (!compact) card.addView(homeButton(getString(R.string.open_car_hotspot_settings), false) { openCarWifiSettings() }, matchButton(CONTROL_GAP_DP, 56))
+            if (!compact || BuildConfig.IS_ZEEKR) card.addView(homeButton(getString(R.string.open_car_hotspot_settings), false) { openCarWifiSettings() },
+                matchButton(CONTROL_GAP_DP, if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.MIN_TOUCH_DP else 56))
         } else {
             homeLastProblem = label("", 15, MUTED).apply { setPadding(0, dp(14), 0, 0) }.also(card::addView)
         }
-        card.addView(homeButton(getString(R.string.choose_iphone), false) { choosePhone() }, matchButton(if (compact) CONTROL_GAP_DP else 16, if (compact) 46 else 56))
+        card.addView(homeButton(getString(R.string.choose_iphone), false) { choosePhone() }, matchButton(if (compact) CONTROL_GAP_DP else 16, if (BuildConfig.IS_ZEEKR && compact) ZeekrHmiTokens.MIN_TOUCH_DP else if (compact) 46 else 56))
         disconnectButton = homeButton(getString(R.string.disconnect), false) {
             disconnectButton?.isEnabled = false
             CarPlayBackgroundSession.stop { runOnUiThread { refreshStatus() } }
         }.apply { visibility = View.GONE }
-        card.addView(disconnectButton, matchButton(if (compact) CONTROL_GAP_DP else 16, if (compact) 46 else 56))
-        val right = column().apply { gravity = Gravity.CENTER_HORIZONTAL }
+        card.addView(disconnectButton, matchButton(if (compact) CONTROL_GAP_DP else 16, if (BuildConfig.IS_ZEEKR && compact) ZeekrHmiTokens.MIN_TOUCH_DP else if (compact) 46 else 56))
+        val right = column().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            if (BuildConfig.IS_ZEEKR) {
+                background = rounded(SURFACE, Color.TRANSPARENT)
+                setPadding(dp(ZeekrHmiTokens.CARD_PADDING_DP), dp(ZeekrHmiTokens.CARD_PADDING_DP),
+                    dp(ZeekrHmiTokens.CARD_PADDING_DP), dp(ZeekrHmiTokens.CARD_PADDING_DP))
+            }
+        }
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.ic_carplay)
-            contentDescription = getString(R.string.carplay_icon)
+            contentDescription = getString(if (BuildConfig.IS_ZEEKR) R.string.diplay else R.string.carplay_icon)
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         val branding = column().apply {
             gravity = Gravity.CENTER
             addView(logo, LinearLayout.LayoutParams(dp(96), dp(96)))
         }
-        right.addView(homeButton(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton(height = if (compact) 54 else 68))
+        right.addView(homeButton(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton(height = if (BuildConfig.IS_ZEEKR && compact) ZeekrHmiTokens.MIN_TOUCH_DP else if (compact) 54 else 68))
         if (!compact) right.addView(label(getString(R.string.plug_your_iphone_into_a_usb_data_port_allow_carplay_when_y), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(dp(8), dp(10), dp(8), dp(24)) })
         else right.addView(space(16))
-        right.addView(homeButton(getString(R.string.settings), false) { page = "settings"; render() }, matchButton(height = if (compact) 54 else 68))
+        right.addView(homeButton(getString(R.string.settings), false) { page = "settings"; render() }, matchButton(height = if (BuildConfig.IS_ZEEKR && compact) ZeekrHmiTokens.MIN_TOUCH_DP else if (compact) 54 else 68))
         if (!compact) right.addView(label(getString(R.string.make_diplay_feel_right_for_your_car), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, dp(24)) })
         else right.addView(space(12))
         right.addView(label(getString(R.string.home_public_preview, version()), 12, MUTED).apply { letterSpacing = .08f })
@@ -1026,11 +1062,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 setOnClickListener { openAvailableUpdate(release) }
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         }
-        if (compact && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        if (BuildConfig.IS_ZEEKR && wide && !compact) {
+            body.addView(left)
+            body.addView(space(SETTINGS_BLOCK_GAP_DP))
+            body.addView(row().apply {
+                gravity = Gravity.TOP
+                addView(card, LinearLayout.LayoutParams(0, -2, 1.6f))
+                addView(space(ZeekrHmiTokens.HOME_COLUMNS_GAP_DP), LinearLayout.LayoutParams(dp(ZeekrHmiTokens.HOME_COLUMNS_GAP_DP), 1))
+                addView(right, LinearLayout.LayoutParams(0, -2, 1f))
+            })
+        } else if (compact && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             val compactRight = column().apply {
-                addView(space(8))
-                addView(branding)
-                addView(space(24))
+                if (!BuildConfig.IS_ZEEKR) {
+                    addView(space(8))
+                    addView(branding)
+                    addView(space(24))
+                }
                 addView(right)
             }
             body.addView(row().apply {
@@ -1058,11 +1105,24 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             body.addView(card)
             body.addView(space(26))
-            body.addView(branding)
-            body.addView(space(24))
+            if (!BuildConfig.IS_ZEEKR) {
+                body.addView(branding)
+                body.addView(space(24))
+            }
             body.addView(right)
         }
-        setupError?.let { body.addView(label(it, 16, WARNING).apply { setPadding(0, dp(16), 0, 0) }) }
+        setupError?.let { message ->
+            val notice = label(message, 16, WARNING).apply {
+                if (BuildConfig.IS_ZEEKR) {
+                    val padding = dp(ZeekrHmiTokens.NOTICE_PADDING_DP)
+                    setPadding(padding, padding, padding, padding)
+                    background = warningSurface()
+                } else setPadding(0, dp(16), 0, 0)
+            }
+            body.addView(notice, LinearLayout.LayoutParams(-1, -2).apply {
+                if (BuildConfig.IS_ZEEKR) topMargin = dp(ZeekrHmiTokens.BLOCK_GAP_DP)
+            })
+        }
         content.addView(body)
     }
 
@@ -1076,20 +1136,21 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val split = row().apply { gravity = Gravity.TOP }
         // The rail scrolls on its own only when the window is too short for every destination.
         split.addView(ScrollView(this@DiPlayActivity).apply {
+            isVerticalScrollBarEnabled = !BuildConfig.IS_ZEEKR
             addView(column().apply {
                 setPadding(0, 0, 0, dp(12))
                 addView(settingsRail())
             })
             settingsRailScroll = this
         },
-            LinearLayout.LayoutParams(dp(SettingsLayoutPolicy.railWidthDp(resources.configuration.fontScale)), -2))
+            LinearLayout.LayoutParams(dp(if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.railWidthDp(resources.configuration.fontScale) else SettingsLayoutPolicy.railWidthDp(resources.configuration.fontScale)), -2))
         split.addView(space(24), LinearLayout.LayoutParams(dp(24), 1))
         split.addView(categoryScroll, LinearLayout.LayoutParams(0, -1, 1f))
         addView(split, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun settingsRail(): LinearLayout = column().apply {
-        background = rounded(SURFACE, BORDER)
+        background = if (BuildConfig.IS_ZEEKR) null else rounded(SURFACE, BORDER)
         setPadding(dp(12), dp(12), dp(12), dp(12))
         SettingsCategory.entries.forEach { category ->
             addView(settingsRailDestination(category), matchButton(0, 52).apply {
@@ -1120,7 +1181,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             setPadding(dp(8), 0, dp(12), 0)
             addView(View(this@DiPlayActivity).apply {
                 background = GradientDrawable().apply {
-                    setColor(if (selected) ACCENT else Color.TRANSPARENT)
+                    setColor(if (selected) if (BuildConfig.IS_ZEEKR) FOCUS_RING else ACCENT else Color.TRANSPARENT)
                     cornerRadius = dp(2).toFloat()
                 }
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -1130,7 +1191,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 imageTintList = ColorStateList.valueOf(if (selected) ACCENT else TEXT)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(26), dp(26)).apply { marginEnd = dp(12) })
-            addView(label(title, 16, if (selected) ACCENT else TEXT, true,
+            addView(label(title, 16, if (BuildConfig.IS_ZEEKR) TEXT else if (selected) ACCENT else TEXT, true,
                 centreGlyphs = usesChineseGlyphAlignment(resources.configuration.locales[0].language, title)),
                 LinearLayout.LayoutParams(0, -1, 1f))
             setOnClickListener {
@@ -1194,7 +1255,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         content.addView(readiness, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
         content.addView(button(getString(R.string.setup_guide), false) { openSetupGuide(fromSettings = true) },
             LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(6) })
-        content.addView(label(getString(R.string.setup_guide_description), 14, MUTED).apply {
+        content.addView(label(getString(if (BuildConfig.IS_ZEEKR) R.string.choose_how_to_connect_follow_the_setup_steps_and_save_your else R.string.setup_guide_description), 14, MUTED).apply {
             setPadding(0, 0, 0, dp(20))
         })
 
@@ -1257,6 +1318,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (state == renderedReadiness) return
         renderedReadiness = state
         card.removeAllViews()
+        if (BuildConfig.IS_ZEEKR) card.background = if (state.needsAction) warningSurface()
+            else rounded(SURFACE, Color.TRANSPARENT)
         val title = getString(when (state) {
             SettingsReadiness.SETUP_ERROR, SettingsReadiness.HOTSPOT_SETUP -> R.string.setup_needs_attention
             SettingsReadiness.CONNECTED -> R.string.carplay_connected
@@ -1278,7 +1341,21 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             state == SettingsReadiness.CONNECTED -> READY
             else -> TEXT
         }
-        card.addView(label(title, 22, tint, true))
+        if (BuildConfig.IS_ZEEKR) card.addView(row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ImageView(this@DiPlayActivity).apply {
+                setImageResource(when {
+                    state.needsAction -> R.drawable.ic_kr_alert
+                    state == SettingsReadiness.CONNECTED -> R.drawable.ic_kr_check
+                    else -> R.drawable.ic_dp_connection
+                })
+                imageTintList = ColorStateList.valueOf(tint)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(ZeekrHmiTokens.ICON_DP), dp(ZeekrHmiTokens.ICON_DP)).apply {
+                marginEnd = dp(SETTINGS_CONTROL_INSET_DP)
+            })
+            addView(label(title, 22, tint, true), LinearLayout.LayoutParams(0, -2, 1f))
+        }) else card.addView(label(title, 22, tint, true))
         card.addView(label(detail, 15, MUTED).apply { setPadding(0, dp(6), 0, 0) })
         when (state) {
             SettingsReadiness.CHOOSE_IPHONE -> card.addView(button(getString(R.string.settings_choose_iphone_action), true) {
@@ -1341,12 +1418,25 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 addView(label(settingsCategoryTitle(category), 17, if (warning) WARNING else TEXT, true))
                 addView(label(summary, 13, MUTED).apply { setPadding(0, dp(3), 0, 0) })
             }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (BuildConfig.IS_ZEEKR) addView(ImageView(this@DiPlayActivity).apply {
+                setImageResource(R.drawable.ic_dp_chevron)
+                imageTintList = ColorStateList.valueOf(MUTED)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(ZeekrHmiTokens.ICON_DP), dp(ZeekrHmiTokens.ICON_DP)).apply {
+                marginStart = dp(SETTINGS_CONTROL_INSET_DP)
+            })
         })
         setOnClickListener { openSettingsCategory(category) }
     }
 
     private fun settingsPageTitle(content: LinearLayout, title: String, subtitle: String) {
-        content.addView(label(title, if (isExpandedSettingsLayout) 34 else 26, TEXT, true))
+        if (BuildConfig.IS_ZEEKR && page == "settings" && settingsCategory !in setOf(SettingsCategory.LANGUAGE, SettingsCategory.ABOUT)) {
+            content.addView(label(title, ZeekrHmiTokens.PAGE_TITLE_SP, TEXT, true), LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(SETTINGS_BLOCK_GAP_DP)
+            })
+            return
+        }
+        content.addView(label(title, if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.PAGE_TITLE_SP else if (isExpandedSettingsLayout) 34 else 26, TEXT, true))
         content.addView(label(subtitle, 16, MUTED).apply { setPadding(0, dp(6), 0, dp(20)) })
     }
 
@@ -1387,7 +1477,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         settingsPageTitle(content, getString(R.string.settings_navigation), getString(R.string.settings_navigation_summary))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.NAVIGATION))
         // The BYD card is hidden without its receiver; say so instead of leaving a gap.
-        if (!BydOutputSettings.available(this)) {
+        if (!BuildConfig.IS_ZEEKR && !BydOutputSettings.available(this)) {
             content.addView(label(getString(R.string.settings_byd_navigation_unavailable), 15, MUTED).apply {
                 setPadding(dp(4), 0, dp(4), dp(SETTINGS_BLOCK_GAP_DP))
             })
@@ -1692,11 +1782,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             })
         }
         content.addView(caution, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
+        if (BuildConfig.IS_ZEEKR) advancedVehicleDataSettings(content)
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.ADVANCED))
-        advancedVehicleDataSettings(content)
+        if (!BuildConfig.IS_ZEEKR) advancedVehicleDataSettings(content)
     }
 
     private fun advancedVehicleDataSettings(content: LinearLayout) {
+        if (BuildConfig.IS_ZEEKR) {
+            section(content, getString(R.string.settings_native_vehicle_title), R.drawable.ic_dp_car, ::nativeVehicleDataSettings)
+            return
+        }
         section(content, getString(R.string.settings_vehicle), R.drawable.ic_dp_dashboard) { card ->
             card.addView(button(getString(if (bydVehicleAdvancedExpanded)
                 R.string.hide_advanced_vehicle_data else R.string.advanced_vehicle_data), false) {
@@ -1705,7 +1800,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }, matchButton(0, 56))
             if (bydVehicleAdvancedExpanded) {
                 advancedVehicleData(card)
-                if (!BydOutputSettings.available(this) && !nativeVehicleDataSupported()) clusterSongSwitch(card)
+                if (!BuildConfig.IS_ZEEKR && !BydOutputSettings.available(this)) clusterSongSwitch(card)
             }
         }
     }
@@ -1724,6 +1819,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun allSettingsSections(content: LinearLayout) {
+        filteredSection(content, SettingsSection.ZEEKR_INTERACTION,
+            getString(R.string.settings_zeekr_interaction), R.drawable.ic_dp_car, ::zeekrInteractionControls)
         filteredSection(content, SettingsSection.CARPLAY_CONTROLS,
             getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->
             val gestureFingers = listOf(0, 2, 3, 4)
@@ -1733,7 +1830,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 reconnects = false) {
                 AirPlayPersistence.saveSettingsGestureFingers(this, gestureFingers[it])
             }
-            card.addView(label(getString(R.string.settings_gesture_fingers_hint), 14, MUTED).apply {
+            card.addView(label(getString(if (BuildConfig.IS_ZEEKR) R.string.settings_zeekr_gesture_hint else R.string.settings_gesture_fingers_hint), 14, MUTED).apply {
                 setPadding(0, dp(10), 0, 0)
             })
             toggle(card, getString(R.string.right_hand_drive), getString(R.string.place_carplay_s_controls_closer_to_the_driver), AirPlayPersistence.loadRightHandDrive(this)) { AirPlayPersistence.saveRightHandDrive(this, it); markReconnectNeeded() }
@@ -1952,7 +2049,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveHarmanFullscreen(this, enabled)
             }
             toggle(card, getString(R.string.settings_carplay_same_task),
-                getString(R.string.settings_carplay_same_task_description),
+                getString(if (BuildConfig.IS_ZEEKR) R.string.settings_zeekr_window_hint else R.string.settings_carplay_same_task_description),
                 AirPlayPersistence.loadCarPlaySameTask(this)) { enabled ->
                 AirPlayPersistence.saveCarPlaySameTask(this, enabled)
                 CarPlayScreen.closeIfElsewhere(this)
@@ -2541,11 +2638,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val addresses = SettingsBackupServer.addressCandidates(preferredPrefix)
         // The same page serves both; opened from Diagnostics, it says what the driver came for.
         val forReport = backupOpenedFrom == SettingsCategory.DIAGNOSTICS
-        content.addView(label(getString(if (forReport) R.string.settings_report_on_phone else R.string.backup_title), 40, TEXT, true))
+        content.addView(label(getString(if (forReport) R.string.settings_report_on_phone else R.string.backup_title),
+            if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.PAGE_TITLE_SP else 40, TEXT, true))
         var endpoint = backupEndpoint
         if ((backupServer == null || endpoint == null) && addresses.isEmpty()) {
             content.addView(space(SETTINGS_BLOCK_GAP_DP))
-            content.addView(label(getString(R.string.backup_no_network), 16, MUTED))
+            content.addView(if (BuildConfig.IS_ZEEKR) card().apply {
+                addView(label(getString(R.string.backup_no_network), 16, MUTED))
+            } else label(getString(R.string.backup_no_network), 16, MUTED))
             return
         }
         if (backupServer == null || endpoint == null) {
@@ -2554,7 +2654,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 export = { SettingsBackupCodec.export(this, version()) },
                 import = { SettingsBackupCodec.import(this, it) },
                 report = { diagnosticReportText(applicationContext).toByteArray(Charsets.UTF_8) },
-                codePage = assets.open("settings-code.html").use { it.readBytes() },
+                codePage = brandedPageHtml("settings-code.html"),
             )
             created.onCodeEntryClosed = {
                 runOnUiThread {
@@ -2583,7 +2683,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             if (endpoint == null) {
                 created.stop()
                 content.addView(space(SETTINGS_BLOCK_GAP_DP))
-                content.addView(label(getString(R.string.backup_no_network), 16, MUTED))
+                content.addView(if (BuildConfig.IS_ZEEKR) card().apply {
+                    addView(label(getString(R.string.backup_no_network), 16, MUTED))
+                } else label(getString(R.string.backup_no_network), 16, MUTED))
                 return
             }
             backupServer = created
@@ -2592,15 +2694,28 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         val active = endpoint
         backupServer?.landing = if (forReport) "#report" else ""
+        val qrSideDp = if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.qrSideDp(resources.configuration.screenWidthDp, isCompactLayout) else 240
         val qr = ImageView(this).apply {
-            val side = dp(240)
+            val side = dp(qrSideDp)
             setImageBitmap(SettingsQrCode.encode(active.url(addresses.first()) + if (forReport) "#report" else "", side))
             scaleType = ImageView.ScaleType.FIT_CENTER
+            if (BuildConfig.IS_ZEEKR) {
+                setBackgroundColor(Color.WHITE)
+                val inset = dp(ZeekrHmiTokens.QR_FRAME_INSET_DP)
+                setPadding(inset, inset, inset, inset)
+            }
+            if (BuildConfig.IS_ZEEKR) doOnLayout {
+                val container = parent as? ViewGroup ?: return@doOnLayout
+                val available = (container.width - container.paddingLeft - container.paddingRight).coerceAtLeast(1)
+                val side = minOf(width, available)
+                if (width != side || height != side) layoutParams = layoutParams.apply { width = side; height = side }
+            }
         }
         content.addView(space(SETTINGS_BLOCK_GAP_DP))
         content.addView(card().apply {
             addView(label(getString(if (forReport) R.string.settings_report_on_phone_hint else R.string.backup_page_hint), 16, MUTED))
-            addView(qr, LinearLayout.LayoutParams(dp(240) + dp(24), dp(240) + dp(24)).apply {
+            val qrFrameDp = qrSideDp + if (BuildConfig.IS_ZEEKR) 2 * ZeekrHmiTokens.QR_FRAME_INSET_DP else 24
+            addView(qr, LinearLayout.LayoutParams(dp(qrFrameDp), dp(qrFrameDp)).apply {
                 topMargin = dp(SETTINGS_BLOCK_GAP_DP); gravity = Gravity.CENTER_HORIZONTAL
             })
             backupSummary?.let {
@@ -2632,7 +2747,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         backupSummary = null
     }
 
-    private fun backupPageHtml(): ByteArray = assets.open("settings-backup.html").use { it.readBytes() }
+    private fun backupPageHtml(): ByteArray = brandedPageHtml("settings-backup.html")
+
+    private fun brandedPageHtml(asset: String): ByteArray = assets.open(asset).use { it.readBytes() }.let { bytes ->
+        if (!BuildConfig.IS_ZEEKR) bytes else bytes.toString(Charsets.UTF_8)
+            .replace("DiPlay", BuildConfig.EDITION_APPLICATION_LABEL).toByteArray(Charsets.UTF_8)
+    }
 
     private fun updateRow(): View {
         val container = column().apply { setPadding(0, dp(12), 0, 0) }
@@ -2869,8 +2989,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun bydAdbSettings(parent: LinearLayout) {
         if (AirPlayPersistence.loadWirelessHotspotMode(this) != WirelessHotspotMode.MANUAL) return
-        if (!CarHotspotSetup.isBydHeadUnit(this)) {
-            if (CarHotspotTethering.appStartSupported()) {
+        if (BuildConfig.IS_ZEEKR || !CarHotspotSetup.isBydHeadUnit(this)) {
+            if (CarHotspotTethering.appStartSupported() || CarHotspotTethering.vehicleServiceAvailable(this)) {
                 Log.i("DiPlay-Hotspot", "BYD head unit not detected: hotspot control through system settings access")
                 systemHotspotSettings(parent)
             } else {
@@ -3316,13 +3436,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun setupGuide(content: LinearLayout) {
         val step = setupStep.coerceIn(SetupGuide.STEP_CAR, SetupGuide.STEP_DONE)
-        content.addView(label(getString(R.string.setup_step_of, step + 1, SetupGuide.STEP_COUNT), 13, ACCENT, true)
-            .apply { letterSpacing = .12f })
+        content.addView(label(getString(R.string.setup_step_of, step + 1, SetupGuide.STEP_COUNT), 13,
+            if (BuildConfig.IS_ZEEKR) MUTED else ACCENT, true)
+            .apply { letterSpacing = if (BuildConfig.IS_ZEEKR) .02f else .12f })
         val progress = row().apply { setPadding(0, dp(10), 0, dp(20)) }
         repeat(SetupGuide.STEP_COUNT) { index ->
             progress.addView(View(this).apply {
                 background = GradientDrawable().apply {
-                    setColor(if (index <= step) ACCENT else BUTTON); cornerRadius = dp(3).toFloat()
+                    setColor(if (BuildConfig.IS_ZEEKR && index == step) FOCUS_RING else if (index <= step) ACCENT else BUTTON)
+                    cornerRadius = dp(3).toFloat()
                 }
             }, LinearLayout.LayoutParams(0, dp(6), 1f).apply { if (index > 0) marginStart = dp(8) })
         }
@@ -3337,24 +3459,33 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (step == SetupGuide.STEP_DONE) return
         val footer = row().apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, 0) }
         footer.addView(button(getString(R.string.setup_skip), false) { closeSetupGuide() },
-            LinearLayout.LayoutParams(0, dp(60), 1f))
+            LinearLayout.LayoutParams(0, if (BuildConfig.IS_ZEEKR) -2 else dp(60), 1f))
         footer.addView(space(16), LinearLayout.LayoutParams(dp(16), 1))
         footer.addView(button(getString(R.string.setup_next), true) {
-            if (step == SetupGuide.STEP_CAR && SetupGuide.applyFirstSetupDefaults(this,
+            if (!BuildConfig.IS_ZEEKR && step == SetupGuide.STEP_CAR && SetupGuide.applyFirstSetupDefaults(this,
                     DiLinkGeneration.confirmed(this) ?: DiLinkGeneration.detect().generation,
                     phoneChosen = DiPlayPreferences.phoneAddress(this) != null)) markReconnectNeeded()
             setupStep = step + 1; render()
         },
-            LinearLayout.LayoutParams(0, dp(60), 1f))
+            LinearLayout.LayoutParams(0, if (BuildConfig.IS_ZEEKR) -2 else dp(60), 1f))
+        if (BuildConfig.IS_ZEEKR) fitZeekrButtonRow(footer,
+            (0 until footer.childCount).map(footer::getChildAt).filterIsInstance<Button>())
         content.addView(footer)
     }
 
     private fun setupTitle(content: LinearLayout, title: Int, description: String) {
-        content.addView(label(getString(title), 34, TEXT, true))
+        content.addView(label(getString(title), if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.PAGE_TITLE_SP else 34, TEXT, true))
         content.addView(label(description, 17, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
     }
 
     private fun setupCarStep(content: LinearLayout) {
+        if (BuildConfig.IS_ZEEKR) {
+            settingsPageTitle(content, BuildConfig.DEFAULT_OEM_LABEL, getString(R.string.settings_zeekr_interaction))
+            section(content, getString(R.string.settings_native_vehicle_title), R.drawable.ic_dp_car) { card ->
+                card.addView(label(getString(R.string.settings_native_vehicle_description), 16, MUTED))
+            }
+            return
+        }
         val detection = DiLinkGeneration.detect()
         val selected = DiLinkGeneration.confirmed(this) ?: detection.generation
         setupTitle(content, R.string.setup_car_title, when (detection.source) {
@@ -3386,6 +3517,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         setupTitle(content, R.string.setup_connection_title, getString(R.string.setup_connection_description))
         val card = card()
         wirelessLinkControls(card)
+        if (BuildConfig.IS_ZEEKR) normalizeSpacing(card, isCard = false)
         content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
@@ -3406,6 +3538,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         card.addView(button(getString(R.string.review_app_permissions), false) {
             openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
         }, matchButton(12, 60))
+        if (BuildConfig.IS_ZEEKR) normalizeSpacing(card, isCard = false)
         content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
@@ -3421,6 +3554,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun setupFeaturesStep(content: LinearLayout) {
+        if (BuildConfig.IS_ZEEKR) {
+            settingsPageTitle(content, getString(R.string.settings_zeekr_interaction), getString(R.string.settings_vehicle_summary))
+            section(content, getString(R.string.settings_zeekr_media), R.drawable.ic_dp_audio, ::zeekrInteractionControls)
+            return
+        }
         val generation = DiLinkGeneration.current(this)
         // "Suggested for Not sure" names no car; most head units that are not BYD's land here.
         setupTitle(content, R.string.setup_features_title,
@@ -3500,11 +3638,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             render()
         }, matchButton(12, 60))
         card.addView(button(getString(R.string.done), false) { closeSetupGuide() }, matchButton(12, 60))
+        if (BuildConfig.IS_ZEEKR) normalizeSpacing(card, isCard = false)
         content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
     private fun connectionSetup(content: LinearLayout) {
-        content.addView(label(getString(R.string.connection_setup), 34, TEXT, true))
+        content.addView(label(getString(R.string.connection_setup), if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.PAGE_TITLE_SP else 34, TEXT, true))
         content.addView(label(getString(R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha), 17, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
         section(content, getString(R.string.s_1_choose_your_connection)) { card -> wirelessLinkControls(card) }
         section(content, getString(R.string.s_2_pair_your_iphone)) { card ->
@@ -3556,9 +3695,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     pendingCarHotspotSetup = false
                     applyWirelessLink(candidate)
                 }
-            }, matchButton(12, 60))
+            }, matchButton(12, 60).apply { if (BuildConfig.IS_ZEEKR) height = ViewGroup.LayoutParams.WRAP_CONTENT })
             option.addView(label(descriptions[index], 15, MUTED).apply { setPadding(0, dp(6), 0, dp(12)) })
         }
+        if (BuildConfig.IS_ZEEKR && wide) fitZeekrButtonRow(choices,
+            (0 until choices.childCount).map { (choices.getChildAt(it) as ViewGroup).getChildAt(0) as Button })
         if (mode == WirelessHotspotMode.MANUAL) {
             parent.addView(label(getString(R.string.hotspot_setup), 22, TEXT, true))
             parent.addView(label(getString(R.string.s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele), 16, MUTED).apply { setPadding(0, dp(8), 0, dp(12)) })
@@ -4188,7 +4329,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         })
         body.addView(button(getString(R.string.copy_command), false) {
             getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(
-                android.content.ClipData.newPlainText("DiPlay ADB Command", adbCmd)
+                android.content.ClipData.newPlainText("${getString(R.string.diplay)} ADB Command", adbCmd)
             )
             toast(getString(R.string.copied_to_the_car_clipboard_run_the_command_on_your_comput))
         }, matchButton(8, 50))
@@ -4229,7 +4370,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     // One place for the key service setup, above every feature that needs it.
     private fun wheelKeysSettings(card: LinearLayout) {
         // The joystick and map zoom use BYD's media and custom keys.
-        val byd = CarHotspotSetup.isBydHeadUnit(this)
+        val byd = !BuildConfig.IS_ZEEKR && CarHotspotSetup.isBydHeadUnit(this)
         val zoomAvailable = wheelMapZoomAvailable()
         val vehicleKeysOn = WheelZoomSettings.joystick(this) ||
             (zoomAvailable && WheelZoomSettings.enabled(this))
@@ -4249,7 +4390,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         // It acts on BYD's short voice keys (327, 304) only, which other head units never send. Once on it
         // stays reachable, like the controls below, in case the package check misses the car.
-        if (byd || WheelZoomSettings.siriLongPressOnly(this)) {
+        if (!BuildConfig.IS_ZEEKR && (byd || WheelZoomSettings.siriLongPressOnly(this))) {
             toggle(card, getString(R.string.wheel_siri_long_press_only), getString(R.string.wheel_siri_long_press_only_description),
                 WheelZoomSettings.siriLongPressOnly(this)) { WheelZoomSettings.setSiriLongPressOnly(this, it) }
         }
@@ -4257,11 +4398,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
             AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
         // Keep previously configured controls reachable even if package detection misses the car.
-        if (byd || zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
+        if (!BuildConfig.IS_ZEEKR && (byd || zoomAvailable || WheelZoomSettings.joystick(this))) wheelKeyControls(card)
     }
 
     // Map zoom only works where the dashboard map card used to show these controls.
     private fun wheelMapZoomAvailable(): Boolean {
+        if (BuildConfig.IS_ZEEKR) return false
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return false
         val adbCluster = AdbClusterRouter.enabled(this)
         if (DiLink51ClusterLayout.supported() && !adbCluster) return false
@@ -4535,8 +4677,26 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         BydNavigationOutputs.carPlayCallsChanged(enabled)
     }
 
+    private fun zeekrInteractionControls(card: LinearLayout) {
+        toggle(card, getString(R.string.settings_zeekr_media), getString(R.string.settings_zeekr_media_description),
+            ZeekrInteractionSettings.mediaEnabled(this)) {
+            ZeekrInteractionSettings.setMediaEnabled(this, it)
+            markReconnectNeeded()
+            render()
+        }
+        toggle(card, getString(R.string.settings_zeekr_auto_select), getString(R.string.settings_zeekr_auto_select_description),
+            ZeekrInteractionSettings.autoSelect(this), enabled = ZeekrInteractionSettings.mediaEnabled(this)) {
+            ZeekrInteractionSettings.setAutoSelect(this, it)
+            markReconnectNeeded()
+        }
+        toggle(card, getString(R.string.settings_zeekr_controls), getString(R.string.settings_zeekr_controls_description),
+            ZeekrInteractionSettings.controlsEnabled(this), enabled = ZeekrInteractionSettings.mediaEnabled(this)) {
+            ZeekrInteractionSettings.setControlsEnabled(this, it)
+            markReconnectNeeded()
+        }
+    }
+
     private fun nativeVehicleDataSettings(card: LinearLayout) {
-        card.addView(label(getString(R.string.settings_native_vehicle_title), 18, TEXT))
         card.addView(label(getString(R.string.settings_native_vehicle_description), 14, MUTED))
         toggle(card, getString(R.string.car_battery_for_the_iphone),
             getString(R.string.settings_native_vehicle_battery_description), BydOutputSettings.batteryToIphone(this)) {
@@ -4560,7 +4720,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun checkNativeVehicleData() {
         if (nativeVehicleCheckRunning) return
         nativeVehicleCheckRunning = true
-        toast(getString(R.string.probing_vehicle_data))
+        toast(getString(R.string.settings_native_vehicle_check))
         Thread({
             val source = createVehicleDataSource(applicationContext)
             val result = try {
@@ -4581,11 +4741,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     .setTitle(R.string.settings_native_vehicle_check).setMessage(result)
                     .setPositiveButton(R.string.close, null).show()
             }
-        }, "Zeekr-vehicle-check").start()
+        }, "zeekr-vehicle-check").start()
     }
 
     private fun advancedVehicleData(card: LinearLayout) {
-        if (nativeVehicleDataSupported()) {
+        if (BuildConfig.IS_ZEEKR) {
             nativeVehicleDataSettings(card)
             return
         }
@@ -5368,13 +5528,20 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun reconnectBar(): View = row().apply {
         gravity = Gravity.CENTER_VERTICAL
-        background = rounded(RAIL_SELECTED, RAIL_SELECTED_BORDER)
+        background = if (BuildConfig.IS_ZEEKR) warningSurface() else rounded(RAIL_SELECTED, RAIL_SELECTED_BORDER)
         setPadding(dp(20), dp(10), dp(12), dp(10))
-        addView(label(getString(R.string.settings_reconnect_pending), 16, TEXT), LinearLayout.LayoutParams(0, -2, 1f))
+        addView(label(getString(R.string.settings_reconnect_pending), 16, if (BuildConfig.IS_ZEEKR) WARNING else TEXT), LinearLayout.LayoutParams(0, -2, 1f))
         addView(button(getString(R.string.settings_reconnect_now), true) {
             // No clear(): if connect() stops early (hotspot off, a permission prompt), the change is still pending.
             reconnectIfRunning()
-        }, LinearLayout.LayoutParams(-2, dp(52)).apply { marginStart = dp(12) })
+        }.apply {
+            if (BuildConfig.IS_ZEEKR) {
+                minimumHeight = dp(ZeekrHmiTokens.MIN_TOUCH_DP)
+                maxWidth = dp(minOf(resources.configuration.screenWidthDp / 2, ZeekrHmiTokens.INLINE_ACTION_MAX_DP))
+            }
+        }, LinearLayout.LayoutParams(-2, if (BuildConfig.IS_ZEEKR) -2 else dp(52)).apply {
+            marginStart = dp(if (BuildConfig.IS_ZEEKR) SETTINGS_CONTROL_INSET_DP else 12)
+        })
         reconnectBar = this
         refreshReconnectBar()
     }
@@ -5929,13 +6096,25 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val wired = HomeCardTransport.wired(running, AirPlayPersistence.loadWirelessEnabled(this))
         homeCardTitle?.text = getString(if (wired) R.string.home_usb_carplay else R.string.wireless_carplay)
         homeConnectionHint?.visibility = if (wired) View.GONE else View.VISIBLE
+        val hotspotUnavailable = BuildConfig.IS_ZEEKR && !running && carHotspotOff()
         status?.text = when {
             setupError != null -> getString(R.string.setup_needs_attention)
             CarPlayBackgroundSession.active -> getString(R.string.carplay_connected)
             running -> getString(R.string.connecting_to_your_iphone)
+            hotspotUnavailable -> getString(R.string.car_hotspot_is_off)
             DiPlayPreferences.phoneAddress(this) != null -> "${getString(R.string.status_ready_for_prefix)}${DiPlayPreferences.phoneName(this)}"
+            BuildConfig.IS_ZEEKR -> getString(R.string.setup_iphone_none)
             else -> getString(R.string.ready_when_you_are)
         }
+        zeekrFeedback?.show(when {
+            setupError != null -> ZeekrConnectionFeedback.Phase.ERROR
+            CarPlayBackgroundSession.active -> ZeekrConnectionFeedback.Phase.CONNECTED
+            running -> ZeekrConnectionFeedback.Phase.CONNECTING
+            hotspotUnavailable -> ZeekrConnectionFeedback.Phase.ERROR
+            LastConnectionProblem.homeLine(this) != null -> ZeekrConnectionFeedback.Phase.ERROR
+            DiPlayPreferences.phoneAddress(this) == null -> ZeekrConnectionFeedback.Phase.EMPTY
+            else -> ZeekrConnectionFeedback.Phase.READY
+        })
         homeLastProblem?.apply {
             val line = if (CarPlayBackgroundSession.active) null else LastConnectionProblem.homeLine(this@DiPlayActivity)
             visibility = if (line == null) View.GONE else View.VISIBLE
@@ -5969,7 +6148,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }, "adb-cluster-authorize").start()
     }
 
-    private fun reportFileName() = "DiPlay-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())}.txt"
+    private fun reportFileName() = "${getString(R.string.diplay)}-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())}.txt"
 
     private fun saveReportToDownloads() {
         if (exportInProgress) return
@@ -6037,7 +6216,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     /** The text of a diagnostic report. It reads the session logs, so call it off the main thread. */
     private fun diagnosticReportText(appContext: Context): String = buildString {
-        appendLine("DiPlay ${version()} · private beta diagnostic report")
+        appendLine("${getString(R.string.diplay)} ${version()} · private beta diagnostic report")
         appendLine(LastConnectionProblem.report(appContext))
         appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
         appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
@@ -6118,7 +6297,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         appendLine("--- Recent own-app process exits (Android 11+) ---")
         appendLine(ProcessExitDiagnostics.report(appContext))
         appendLine()
-        appendLine("--- Last crash recorded by DiPlay ---")
+        appendLine("--- Last crash recorded by ${getString(R.string.diplay)} ---")
         appendLine(CrashRecord.report(appContext))
         appendLine()
         for (name in SessionLogFile.REPORT_NAMES) {
@@ -6281,9 +6460,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun section(parent: LinearLayout, title: String, icon: Int? = null, build: (LinearLayout) -> Unit) {
         searchIndexSink?.add(title)
         val card = card()
+        if (BuildConfig.IS_ZEEKR && page in setOf("settings", "connection", "setup", "backup")) {
+            parent.addView(label(title, ZeekrHmiTokens.SECTION_TITLE_SP, MUTED, true), LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(ZeekrHmiTokens.GROUP_HEADING_GAP_DP)
+            })
+            build(card)
+            normalizeSpacing(card, isCard = false)
+            parent.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
+            return
+        }
         val heading = row().apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, 0, dp(16)) }
         if (icon != null) heading.addView(ImageView(this).apply {
-            setImageResource(icon); imageTintList = ColorStateList.valueOf(ACCENT)
+            setImageResource(icon); imageTintList = ColorStateList.valueOf(if (BuildConfig.IS_ZEEKR) MUTED else ACCENT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(12) })
         heading.addView(label(title, 22, TEXT, true,
@@ -6332,6 +6520,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         build: (LinearLayout) -> Unit,
     ) {
         if (settingsSectionFilter?.contains(key) == false) return
+        if (BuildConfig.IS_ZEEKR && key in setOf(SettingsSection.BYD_ADB, SettingsSection.BYD_NAVIGATION,
+                SettingsSection.CLUSTER_MAP, SettingsSection.AMBIENT_LIGHTING)) return
+        if (!BuildConfig.IS_ZEEKR && key == SettingsSection.ZEEKR_INTERACTION) return
         section(parent, title, icon, build)
     }
     // Routing changes affect the live cluster surface as soon as the host resumes.
@@ -6366,6 +6557,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             enabled = enabled,
             onChanged = save,
         )
+        if (BuildConfig.IS_ZEEKR) {
+            result.rowView.minimumHeight = dp(ZeekrHmiTokens.MIN_TOUCH_DP)
+            result.switch.minimumHeight = dp(ZeekrHmiTokens.MIN_TOUCH_DP)
+        }
         parent.addView(result.rowView)
         return result.switch
     }
@@ -6591,7 +6786,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         parent.addView(button, matchButton(0, 60)); parent.addView(space(12))
     }
-    private fun card() = column().apply { background = rounded(SURFACE, BORDER); setPadding(dp(24), dp(24), dp(24), dp(24)) }
+    private fun card() = column().apply {
+        background = rounded(SURFACE, if (BuildConfig.IS_ZEEKR) Color.TRANSPARENT else BORDER)
+        val padding = dp(if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.CARD_PADDING_DP else 24)
+        setPadding(padding, padding, padding, padding)
+    }
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }
     private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }
     private class SettingsSearchEditText(context: android.content.Context) : EditText(context) {
@@ -6669,7 +6868,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun headerButton(title: String, icon: Int, compact: Boolean, click: () -> Unit) = button(title, false, click).apply {
         alignVisibleGlyphs = false
-        if (compact) textSize = 16f
+        flat = BuildConfig.IS_ZEEKR
+        if (BuildConfig.IS_ZEEKR || compact) textSize = 16f
         includeFontPadding = false
         setTextColor(TEXT)
         setSingleLine(true)
@@ -6701,7 +6901,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun buttonShape(color: Int, stroke: Int, heightPx: Int = 0) = rounded(color, stroke).apply {
-        cornerRadius = if (heightPx > 0) minOf(dp(24).toFloat(), heightPx * 20f / 56) else layoutCornerRadius()
+        cornerRadius = if (heightPx > 0) minOf(dp(if (BuildConfig.IS_ZEEKR) ZeekrHmiTokens.BUTTON_RADIUS_DP else 24).toFloat(), heightPx * 20f / 56) else layoutCornerRadius()
     }
 
     private fun buttonFocusRing() = focusRing(
@@ -6719,7 +6919,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         searchIndexSink?.add(title.substringBefore(VALUE_SEPARATOR))
         setOnClickListener { click() }
         doOnLayout {
-            val shape = buttonShape(if (primary) ACCENT else BUTTON, if (primary) ACCENT else BORDER, height)
+            val quiet = flat || (BuildConfig.IS_ZEEKR && page != "home" && !primary && !action && text.contains(VALUE_SEPARATOR))
+            if (BuildConfig.IS_ZEEKR && !quiet && layoutParams.height == ViewGroup.LayoutParams.WRAP_CONTENT) {
+                val inset = dp(ZeekrHmiTokens.CONTROL_VERTICAL_INSET_DP)
+                setPaddingRelative(paddingStart, inset, paddingEnd, inset)
+            }
+            val shape = buttonShape(if (quiet) Color.TRANSPARENT else if (primary) ACCENT else BUTTON,
+                if (quiet || BuildConfig.IS_ZEEKR) Color.TRANSPARENT else if (primary) ACCENT else BORDER, height)
             background = android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(RIPPLE), shape, null)
             foreground = focusRing((shape.cornerRadius / resources.displayMetrics.density).roundToInt())
         }
@@ -6727,7 +6933,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun iconButton(icon: Int, description: String, click: () -> Unit) = ImageButton(this).apply {
         setImageResource(icon)
-        imageTintList = ColorStateList.valueOf(ACCENT)
+        imageTintList = ColorStateList.valueOf(if (BuildConfig.IS_ZEEKR) TEXT else ACCENT)
         contentDescription = description
         scaleType = ImageView.ScaleType.CENTER
         setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -6736,7 +6942,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         stateListAnimator = null
         background = android.graphics.drawable.RippleDrawable(
             ColorStateList.valueOf(RIPPLE),
-            buttonShape(BUTTON, BORDER),
+            buttonShape(if (BuildConfig.IS_ZEEKR) Color.TRANSPARENT else BUTTON,
+                if (BuildConfig.IS_ZEEKR) Color.TRANSPARENT else BORDER),
             null,
         )
         foreground = buttonFocusRing()
@@ -6758,9 +6965,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         private val accent: Int,
     ) : Button(context) {
         var action = false
+        var flat = false
         var contentOffsetY = 0f
         var alignVisibleGlyphs = true
         private val glyphBounds = android.graphics.Rect()
+
+        override fun drawableStateChanged() {
+            super.drawableStateChanged()
+            if (BuildConfig.IS_ZEEKR) alpha = if (isEnabled) 1f else .48f
+        }
 
         fun textAlignmentCentreY(): Float {
             return alignedTextCentreY(this, text, glyphBounds)
@@ -6815,7 +7028,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         })
     }
 
-    private fun rounded(color: Int, stroke: Int) = GradientDrawable().apply { setColor(color); cornerRadius = layoutCornerRadius() * 1.35f; setStroke(dp(1), stroke) }
+    private fun warningSurface() = rounded(if (palette.systemBarIconsAreDark) ZeekrHmiTokens.WARNING_BACKGROUND_LIGHT
+        else ZeekrHmiTokens.WARNING_BACKGROUND_DARK, Color.TRANSPARENT).apply {
+        cornerRadius = dp(ZeekrHmiTokens.NOTICE_RADIUS_DP).toFloat()
+    }
+    private fun fitZeekrButtonRow(parent: LinearLayout, controls: List<Button>) {
+        parent.doOnLayout {
+            val height = controls.maxOfOrNull { control ->
+                maxOf(dp(ZeekrHmiTokens.MIN_TOUCH_DP), (control.layout?.height ?: 0) +
+                    control.compoundPaddingTop + control.compoundPaddingBottom)
+            } ?: return@doOnLayout
+            controls.forEach { control ->
+                if (control.height != height) control.layoutParams = control.layoutParams.apply { this.height = height }
+            }
+        }
+    }
+    private fun rounded(color: Int, stroke: Int) = GradientDrawable().apply { setColor(color); cornerRadius = if (BuildConfig.IS_ZEEKR) dp(ZeekrHmiTokens.CARD_RADIUS_DP).toFloat() else layoutCornerRadius() * 1.35f; setStroke(dp(1), stroke) }
     private fun matchButton(top: Int = 0, height: Int = 68) = LinearLayout.LayoutParams(-1, dp(height)).apply { topMargin = dp(top) }
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)); tag = SPACER }
 
@@ -6853,7 +7081,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             val lp = child.layoutParams as? LinearLayout.LayoutParams ?: continue
             when {
                 child is Button -> {
-                    lp.height = dp(CONTROL_HEIGHT_DP); lp.topMargin = 0
+                    child.minimumHeight = dp(CONTROL_HEIGHT_DP)
+                    lp.height = if (BuildConfig.IS_ZEEKR) ViewGroup.LayoutParams.WRAP_CONTENT else dp(CONTROL_HEIGHT_DP)
+                    lp.topMargin = 0
                     lp.bottomMargin = dp(if (isNote(next)) NOTE_ATTACH_GAP_DP else CONTROL_GAP_DP)
                 }
                 // Toggle rows carried their own vertical padding, which doubled the gap after a button.
@@ -6946,9 +7176,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun refreshAppearance(): Boolean {
         val resolved = resolveAppNightNow()
-        if (resolved == appNight && palette === DiPlayPalette.of(resolved)) return false
+        if (resolved == appNight && palette === DiPlayPalette.of(resolved).forEdition()) return false
         appNight = resolved
-        palette = DiPlayPalette.of(resolved)
+        palette = DiPlayPalette.of(resolved).forEdition()
         return true
     }
 

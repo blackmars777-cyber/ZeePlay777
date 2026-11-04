@@ -15,6 +15,7 @@ android {
 
     defaultConfig {
         minSdk = 24
+        buildConfigField("boolean", "IS_ZEEKR", (edition == "zeekr").toString())
         buildConfigField("String", "DEFAULT_OEM_LABEL", "\"${editionConfig.getValue("carPlayOemLabel")}\"")
         buildConfigField("String", "EDITION_APPLICATION_LABEL", "\"${editionConfig.getValue("applicationLabel")}\"")
     }

@@ -1,75 +1,57 @@
-# DiPlay
+# CarPlay · 極氪 OS 7.2.5 客製版
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)
 
-為相容的比亞迪 Android 車機提供有線與無線 CarPlay，採用熟悉的 DiAuto 介面。DiPlay 是獨立應用程式，正式版套件名稱為 `com.shihab.diplay`。
+**以 Zeekr OS 7.2.5 車機為適配目標的 CarPlay 應用程式**，支援有線與無線連線，著重改善極氪車機上的介面體驗、媒體中心整合、熱點連線與原生車輛資料接入。
 
-> 專案以比亞迪汽車為主要支援對象。其他品牌可能可以執行，但不在一般支援範圍內；特定韌體的個別整合不代表整個品牌受到支援。
+本專案 fork 自 [DiPlay](https://github.com/shihabal3amri/DiPlay)。
 
-[下載與繁體中文網站](https://shihabal3amri.github.io/DiPlay/zh-Hant/) · [0.2.22 版本](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.22) · [回報問題](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
+## 相較原專案的主要改動
 
-![DiPlay 主畫面](site/assets/home.png)
-
-## 開始使用
-
-請將 DiPlay 安裝在**車機上，而非 iPhone**。車機需要允許安裝 APK，且 Android 版本須為 7.0 以上（API 24+）；Android 7.0–8.1 的有線 CarPlay 已在一台實車上確認，無線連線尚待實車驗證。使用時無須越獄、轉接盒、Mac、帳號或遠端認證伺服器。
-
-有線與無線 CarPlay 的核心功能不需要 ADB。部分儀表板、車輛資料、方向盤或停車影片功能需要相容韌體及已授權的網路 ADB，請依各設定的說明操作。
-
-1. 停車後安裝 APK，開啟 DiPlay 並授予所需權限。
-2. 無線模式可選車載熱點、Wi-Fi Direct 或現有 Wi-Fi／同一區域網路；有線模式請使用支援資料傳輸的 USB 連接埠與傳輸線。
-3. 在 iPhone 上接受 CarPlay 提示。連線前先關閉其他手機投影應用程式。
-
-完整步驟請見[安裝與連線指南](docs/INSTALL.zh-TW.md)。
-
-## 切換為繁體中文
-
-開啟 **設定 → 語言 → 應用程式語言**，選擇 **繁體中文**，再按 **套用**。也可選擇 **跟隨系統**。
-
-Android 13 以上會與 Android 的個別應用程式語言設定同步；Android 7.0–12 由 DiPlay 儲存語言選擇。繁體中文使用臺灣用語；香港、澳門及明確指定 `Hant` 的語言選擇共用這份翻譯，並未提供獨立的地區版本。DiPlay 的語言選擇控制其自身介面，CarPlay 內的應用程式語言則由 iPhone 及各應用程式管理。
-
-選用的 **DiPlay Home** 啟動器與 **DiPlay map host** 範例也提供繁體中文，依各自的 Android 系統語言顯示，不共用主要 DiPlay 應用程式的語言偏好。第三方小工具與應用程式名稱由提供者決定。
-
-## 主要功能與 0.2.22 更新
-
-- 有線 USB 與無線 CarPlay，使用本機認證。
-- 相容韌體上的比亞迪抬頭顯示器（HUD）與儀表板導航提示。
-- 解析度、影格率、圖示與文字大小調整；依設定說明，在重新連線後套用。
-- 0.2.22 修正 0.2.21 在比亞迪 DiLink 3.0／4.0 等車機上透過車機熱點無線連線時一直停在「正在開啟 CarPlay」的問題，之前填寫的「熱點網路介面（選填）」可以清空；透過 Wi-Fi 播放音樂時恢復 iPhone 的原始速度，不再先快 1.5% 再卡頓。
-- USB 連線時，微信語音、語音備忘錄和聽寫能錄到聲音；插著線重新連線時，有線 CarPlay 第一次就能連上；連線失敗時，CarPlay 畫面和主畫面會說明原因與修改方式。新增韓文與土耳其文。新選項預設關閉：在桌面卡片中保留 CarPlay、導航提示音請求音訊焦點、依通話本身的取樣率通話、DiLink 3.0 全螢幕儀表地圖，以及騰勢 N9 的儀表地圖。
-- 可在 **設定 → 關於 → 在手機上備份或還原** 透過 QR 碼備份設定，更新時可選其他安裝程式。
-- 本機診斷報告匯出，只有在你選擇分享後才會傳送。
-- 實驗性選項預設關閉，請停車後依說明測試。
-
-[英文版本說明](docs/RELEASE-NOTES-0.2.22.md)與[驗證紀錄](docs/VALIDATION.md)記錄完整變更、已知限制及尚待實車測試的項目。自動化測試通過不代表所有車型、iOS、Siri 或通話情境都已驗證。
-
-## 繁體中文文件
-
-| 文件 | 內容 |
+| 方向 | 客製內容 |
 | --- | --- |
-| [安裝與連線](docs/INSTALL.zh-TW.md) | 首次使用、權限、USB、熱點及 Wi-Fi 模式 |
-| [設定與疑難排解](docs/SETTINGS.zh-TW.md) | 設定分類、重新連線、畫面與聲音、診斷回報 |
-| [隱私權與診斷](docs/PRIVACY.zh-TW.md) | 資料儲存、權限、報告分享及更新檢查 |
-| [從原始碼建置](docs/BUILD.zh-TW.md) | Windows／Android Studio、建置環境、APK 路徑及認證素材 |
-| [翻譯維護](docs/LOCALIZATION.zh-TW.md) | 臺灣用語、資源檢查與文件同步方式 |
-| [本次繁體中文驗證紀錄](docs/VALIDATION.zh-TW.md) | 測試、建置結果及完整 CI 的未解失敗 |
+| 介面 | 參考極氪 OS 7 視覺語言，採用淺色／深色主題、節制的藍色強調、線性圖示與分組清單；適配橫向畫面、分割畫面及大字體。 |
+| 設定 | 重整設定、搜尋及首次設定精靈，隱藏 BYD／DiLink 專屬設定，突出極氪車機功能。 |
+| 媒體中心 | 同步 CarPlay 歌曲、封面與播放進度，轉送支援的車機播放指令，並提供自動切換 CarPlay 音源的選項。 |
+| 車機熱點 | 偵測到原廠熱點服務時優先使用該服務，沿用車機儲存的設定；這條服務路徑不需要 ADB。 |
+| 車輛資料 | 透過相符的 CarSensor 介面讀取實測電量、動態續航、車速與檔位，依需求向 iPhone 回報。 |
+| 設定體驗 | 媒體中心、自動選源及播放控制可分別設定；需要新連線的變更會顯示重新連線提示，由使用者決定何時重連。 |
 
-進階車型整合可參考[比亞迪導航](docs/BYD_NAVIGATION.md)、[Wi-Fi Direct 舊版限制](docs/ANDROID9_WIFI_DIRECT.md)及[現有 Wi-Fi 指南](docs/EXISTING_WIFI.md)；這些深入文件目前為英文。
+## Zeekr OS 7.2.5 適配說明
 
-## 相容性與公開預覽版限制
+**本分支以 Zeekr OS 7.2.5 為適配目標。** 介面依實際視窗大小與系統保留區域排列，不複製原廠狀態列、空調 Dock 或車輛控制元件，也不重新繪製 CarPlay 投影內容。
 
-這是**未經 Apple 認證的公開預覽版**。公開 APK 包含從公開 Carlinkit 韌體取得的實驗性配件身分，並非為 DiPlay 新核發的 MFi 身分；內含私密金鑰可被擷取。未來 iOS 是否接受、各車機的可靠性及該身分是否適合公開散布，仍有未解問題。
+相同 OS 版本不代表所有車型、韌體介面都一致。媒體中心、熱點與車輛資料功能以車機實際服務及權限為準；車輛資料解析仍限定於已相符的車型／韌體組合，不會虛構缺少或未經驗證的讀數。詳細範圍請見[車輛資料適配說明](docs/ZEEKR-VEHICLE-DATA.zh-CN.md)。
 
-Wi-Fi Direct 在 Android 7.0–9 使用依賴韌體的舊版路徑，無法驗證實際協商頻率；Android 10 以上可驗證。車機支援連上 5 GHz Wi-Fi，不代表能建立 5 GHz Wi-Fi Direct 群組。遇到卡頓可先使用車載熱點、30 fps、預設圖示大小及較低解析度，保留 HEVC 關閉。
+## 使用方式
 
-更新時使用相同套件與相符簽章才能保留設定及配對資料；請勿只憑 APK 檔名判斷更新相容性。安裝限制取決於車機韌體。
+1. 將 **Zeekr 版本安裝至車機**，不是 iPhone。套件名稱為 `com.shihab.diplay.hudtest`。
+2. 選擇 USB、車機熱點、Wi-Fi Direct 或現有 Wi-Fi 網路，完成配對並授予所需權限。
+3. 在 **設定 → 車輛 → 車機連動** 中設定媒體中心、自動選源及播放控制。
+4. 確認原生車輛資料可讀後，再依需求開啟進階設定中的電量／續航與車速回報；車速回報還需要開啟位置共享。
 
-## 回報問題
+覆蓋安裝舊版本時需使用相容簽章，才能保留設定與配對資料。獨立車輛資料探針是另一個應用程式，不是 CarPlay 主程式。
 
-重現問題後，開啟 **設定 → 診斷 → 儲存診斷報告**，記錄故障時間並檢查 TXT 內容，再附到[相關問題](https://github.com/shihabal3amri/DiPlay/issues)或[新增問題](https://github.com/shihabal3amri/DiPlay/issues/new/choose)。請提供車型／車機、Android／DiLink／完整韌體版本、iPhone／iOS、連線方式、相關設定與重現步驟。不要公開熱點密碼或認證檔案。詳見[診斷回報步驟](docs/SETTINGS.zh-TW.md#匯出診斷報告與回報問題)。
+## 建置極氪版本
 
-## 原始碼與授權
+```sh
+./gradlew -Pdiplay.edition=zeekr :mobile:assembleDebug
+```
 
-專案基於 [xcertplay](https://github.com/shilapi/xcertplay)（GPL-3.0）。主畫面、設定介面及網站改編自 [DiAuto](https://github.com/shihabal3amri/DiAuto)（AGPL-3.0）；相關授權位於 `docs/licenses`。散布修改版本時請保留[第三方聲明與授權](docs/THIRD_PARTY_NOTICES.md)。CarPlay 與其圖示屬於 Apple Inc.；專案不代表 Apple 或比亞迪的認可。
+輸出檔案：`mobile/build/outputs/apk/debug/mobile-debug.apk`。
 
-一般原始碼／CI 建置預設不包含執行時認證素材；獨立連線測試需要外部素材。Git 與公開原始碼壓縮檔排除認證私密金鑰、Android 簽章金鑰及本機設定；將認證素材打包進 APK 後，接收者仍可擷取。詳見[建置指南](docs/BUILD.zh-TW.md)。
+一般原始碼／CI 建置不包含 CarPlay 認證資產。完整本機建置需依[極氪建置說明](docs/ZEEKR-BUILD.md)提供外部執行資產；認證檔案及簽署金鑰不應提交至儲存庫。
+
+## 文件與問題回報
+
+- [極氪版建置與封裝](docs/ZEEKR-BUILD.md)
+- [媒體中心整合](docs/ZEEKR-MEDIA-SOURCE.md)
+- [免 ADB 原廠熱點服務](docs/ZEEKR-HOTSPOT.md)
+- [車輛資料與實車驗收](docs/ZEEKR-VEHICLE-DATA.zh-CN.md)
+- [介面與元件規範](docs/design/ZEEKR-OS72-HMI.md)
+
+遇到連線或車機整合問題時，可在 **設定 → 診斷** 中匯出報告，並附上車型、完整 OS／韌體版本、iPhone／iOS 版本、連線方式、重現步驟及故障時間。分享前請檢查報告中的個人資訊。
+
+## 來源與授權
+
+本 fork 保留 DiPlay 的現有開源授權及歸屬聲明，詳見 [LICENSE](LICENSE) 與[第三方聲明](docs/THIRD_PARTY_NOTICES.md)。本專案為獨立 fork，與極氪或 Apple 無官方隸屬關係。

@@ -1064,4 +1064,13 @@
     <string name="settings_native_vehicle_permissions">車両データの権限を申請</string>
     <string name="settings_native_vehicle_check">車両データを確認</string>
     <string name="settings_native_vehicle_title">Zeekr車両データ（実験的機能）</string>
+    <string name="settings_zeekr_interaction">車載連携</string>
+    <string name="settings_zeekr_media">メディアセンター</string>
+    <string name="settings_zeekr_media_description">曲、アートワーク、再生位置を同期します。次回接続時に適用。</string>
+    <string name="settings_zeekr_auto_select">音源の自動選択</string>
+    <string name="settings_zeekr_auto_select_description">音楽開始時に CarPlay に切り替えます。次回接続時に適用。</string>
+    <string name="settings_zeekr_controls">再生操作</string>
+    <string name="settings_zeekr_controls_description">対応する車載ボタンで音楽を操作します。次回接続時に適用。</string>
+    <string name="settings_zeekr_gesture_hint">車載システムと競合しないジェスチャーを選んでください。</string>
+    <string name="settings_zeekr_window_hint">対応するホームカードや分割画面で CarPlay をアプリのウィンドウ内に開きます。次回 CarPlay 起動時に適用。</string>
 </resources>

@@ -7,4 +7,4 @@ cd "$(dirname "$0")/.."
 python3 scripts/verify_edition_apk.py mobile/build/outputs/apk/debug/mobile-debug.apk \
     --edition zeekr --auth-assets "$DIPLAY_AUTH_ASSETS_DIR"
 mkdir -p mobile/build/outputs/zeekr
-cp mobile/build/outputs/apk/debug/mobile-debug.apk mobile/build/outputs/zeekr/Zeekr-standalone-debug.apk
+cp mobile/build/outputs/apk/debug/mobile-debug.apk mobile/build/outputs/zeekr/ZeePlay-standalone-debug.apk

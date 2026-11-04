@@ -1065,4 +1065,13 @@
     <string name="settings_native_vehicle_permissions">Request vehicle data permissions</string>
     <string name="settings_native_vehicle_check">Check vehicle data</string>
     <string name="settings_native_vehicle_title">Zeekr vehicle data (experimental)</string>
+    <string name="settings_zeekr_interaction">Vehicle integration</string>
+    <string name="settings_zeekr_media">Zeekr media center</string>
+    <string name="settings_zeekr_media_description">Songs, artwork and progress on the car display. Applies at the next connection.</string>
+    <string name="settings_zeekr_auto_select">Auto-select CarPlay</string>
+    <string name="settings_zeekr_auto_select_description">Switch source when music starts. Applies at the next connection.</string>
+    <string name="settings_zeekr_controls">Playback controls</string>
+    <string name="settings_zeekr_controls_description">Play, pause and skip using supported car controls. Applies at the next connection.</string>
+    <string name="settings_zeekr_gesture_hint">Choose a gesture that does not conflict with the vehicle system.</string>
+    <string name="settings_zeekr_window_hint">Open CarPlay in the app window for compatible launcher cards and split screen. Applies the next time CarPlay opens.</string>
 </resources>

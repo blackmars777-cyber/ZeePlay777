@@ -9,6 +9,6 @@ internal fun createVehicleMediaSource(
     handler: Handler,
     current: () -> Boolean,
     send: (Int) -> Boolean,
-): VehicleMediaSource = ZeekrMediaSource(context, send = { index ->
+): VehicleMediaSource? = if (!ZeekrInteractionSettings.mediaEnabled(context)) null else ZeekrMediaSource(context, send = { index ->
     dispatchZeekrMediaCommand(handler, current) { send(index) }
 }).also { source -> handler.post { source.start() } }

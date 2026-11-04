@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.airplay
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketException
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -54,12 +55,24 @@ class AirPlayEventPeerTest {
         }
     }
 
+    private fun connectControlPeer(port: Int) {
+        try {
+            Socket(InetAddress.getByName("127.0.0.1"), port).use { Thread.sleep(500) }
+        } catch (error: SocketException) {
+            // These fixtures have no pair-verify secret. After accepting the correct peer,
+            // the server immediately closes with SO_LINGER=0; macOS can surface that reset
+            // inside connect() itself. Acceptance is what this test exercises, not handshake.
+            assertTrue("control peer failed before acceptance: $error; $logs",
+                logs.any { it.contains("accepted from /127.0.0.1") })
+        }
+    }
+
     @Test
     fun aStrangerCannotTakeTheEventSlot() = withSession { session ->
         val port = openEvent(session)
         Socket(InetAddress.getByName("::1"), port).use { Thread.sleep(500) }
         try {
-            Socket(InetAddress.getByName("127.0.0.1"), port).use { Thread.sleep(500) }
+            connectControlPeer(port)
         } catch (error: java.net.ConnectException) {
             fail("control peer could not connect after a stranger took the slot: $error")
         }
@@ -70,7 +83,7 @@ class AirPlayEventPeerTest {
     @Test
     fun theControlPeerIsAccepted() = withSession { session ->
         val port = openEvent(session)
-        Socket(InetAddress.getByName("127.0.0.1"), port).use { Thread.sleep(500) }
+        connectControlPeer(port)
         assertTrue("control peer was not accepted: $logs", logs.any { it.contains("accepted from /127.0.0.1") })
     }
 }

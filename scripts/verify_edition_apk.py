@@ -23,7 +23,7 @@ def verify(apk_path, edition, auth_assets=None, aapt2=None):
             resource = re.match(r"\s+resource 0x[0-9a-fA-F]+ (\S+)", line)
             if resource:
                 current = resource.group(1)
-            file_value = re.match(r"\s+\(\) \(file\) (\S+)", line)
+            file_value = re.match(r"\s+\([^)]*\) \(file\) (\S+)", line)
             if current and file_value:
                 resource_files[current] = file_value.group(1)
     with zipfile.ZipFile(apk_path) as apk:
@@ -53,8 +53,13 @@ def verify(apk_path, edition, auth_assets=None, aapt2=None):
             present = any(declaration.encode(encoding) in manifest for encoding in ("utf-8", "utf-16le"))
             require(present == zeekr, declaration)
         if zeekr:
-            require(any("Zeekr".encode(encoding) in manifest for encoding in ("utf-8", "utf-16le")),
-                    "Zeekr application label")
+            require(any("ZeePlay".encode(encoding) in manifest for encoding in ("utf-8", "utf-16le")),
+                    "ZeePlay application label")
+            icon = next((name for name in names if name.startswith("res/") and name.endswith("/zeeplay_icon.png")),
+                        resource_files.get("drawable/zeeplay_icon"))
+            require(icon in names, "ZeePlay icon: use --aapt2 for optimized APKs")
+            artwork = Path(__file__).resolve().parent.parent / "common/src/zeekr/res/drawable-xxxhdpi/zeeplay_icon.png"
+            require(apk.read(icon) == artwork.read_bytes(), "ZeePlay supplied application icon")
             require(b"Lcom/shilapi/xcertplay/hud/StandaloneHudDemoActivity;" not in dex, "BYD debug demo")
         expected_auth = {"assets/offline-mfi/identity.pk8", "assets/offline-mfi/certificate.p7b"}
         bundled_auth = {name for name in names if name.startswith("assets/offline-mfi/") and not name.endswith("/")}

@@ -1022,4 +1022,13 @@
     <string name="settings_native_vehicle_permissions">申請車輛資料權限</string>
     <string name="settings_native_vehicle_check">檢查車輛資料</string>
     <string name="settings_native_vehicle_title">極氪車輛資料（實驗性）</string>
+    <string name="settings_zeekr_interaction">車機連動</string>
+    <string name="settings_zeekr_media">媒體中心</string>
+    <string name="settings_zeekr_media_description">同步歌曲、封面與播放進度。下次連線生效。</string>
+    <string name="settings_zeekr_auto_select">自動選源</string>
+    <string name="settings_zeekr_auto_select_description">播放音樂時切換至 CarPlay。下次連線生效。</string>
+    <string name="settings_zeekr_controls">播放控制</string>
+    <string name="settings_zeekr_controls_description">使用車機及支援的方向盤按鍵控制音樂。下次連線生效。</string>
+    <string name="settings_zeekr_gesture_hint">選擇不會與車機系統衝突的手勢。</string>
+    <string name="settings_zeekr_window_hint">在應用程式視窗中開啟 CarPlay，適用於桌面卡片和分割畫面。下次開啟 CarPlay 時生效。</string>
 </resources>

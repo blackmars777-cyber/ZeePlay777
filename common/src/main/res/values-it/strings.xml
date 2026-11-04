@@ -1052,4 +1052,13 @@
     <string name="settings_native_vehicle_permissions">Richiedi permessi per i dati del veicolo</string>
     <string name="settings_native_vehicle_check">Controlla i dati del veicolo</string>
     <string name="settings_native_vehicle_title">Dati veicolo Zeekr (sperimentale)</string>
+    <string name="settings_zeekr_interaction">Integrazione veicolo</string>
+    <string name="settings_zeekr_media">Centro multimediale</string>
+    <string name="settings_zeekr_media_description">Sincronizza brani, copertine e avanzamento. Si applica alla prossima connessione.</string>
+    <string name="settings_zeekr_auto_select">Selezione automatica</string>
+    <string name="settings_zeekr_auto_select_description">Passa a CarPlay quando inizia la musica. Si applica alla prossima connessione.</string>
+    <string name="settings_zeekr_controls">Comandi di riproduzione</string>
+    <string name="settings_zeekr_controls_description">Controlla la musica con i tasti compatibili del veicolo. Si applica alla prossima connessione.</string>
+    <string name="settings_zeekr_gesture_hint">Scegli un gesto che non interferisca con il sistema del veicolo.</string>
+    <string name="settings_zeekr_window_hint">Apri CarPlay nella finestra dell’app per schede compatibili e schermo diviso. Si applica alla prossima apertura di CarPlay.</string>
 </resources>

@@ -21,6 +21,22 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun zeekrInteractionChoicesRoundTripWithoutServiceState() {
+        val preferences = prefs("zeekr_interaction")
+        preferences.edit().putBoolean("media_enabled", false).putBoolean("auto_select", false)
+            .putBoolean("controls_enabled", true).putString("service_token", "private-runtime-state").commit()
+        val bytes = SettingsBackupCodec.export(context, "test")
+        val exported = JSONObject(String(bytes)).getJSONObject("settings").getJSONObject("zeekr_interaction")
+        assertFalse(exported.getBoolean("media_enabled"))
+        assertFalse(exported.has("service_token"))
+        preferences.edit().clear().commit()
+        SettingsBackupCodec.import(context, bytes)
+        assertFalse(com.shilapi.xcertplay.ZeekrInteractionSettings.mediaEnabled(context))
+        assertFalse(com.shilapi.xcertplay.ZeekrInteractionSettings.autoSelect(context))
+        assertTrue(com.shilapi.xcertplay.ZeekrInteractionSettings.controlsEnabled(context))
+        preferences.edit().clear().commit()
+    }
+
     @Test
     fun navigationPromptAudioFocusTravelsWithTheAudioFocusSettings() {
         AirPlayPersistence.saveNavigationPromptAudioFocus(context, true)

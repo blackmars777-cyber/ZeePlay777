@@ -45,8 +45,10 @@ class DiPlayPaletteTest {
     }
 
     @Test fun semanticRolesMeetTheirWcagContrastTargets() {
-        for (palette in listOf(DiPlayPalette.DARK, DiPlayPalette.LIGHT)) {
+        for (palette in listOf(DiPlayPalette.DARK, DiPlayPalette.LIGHT, DiPlayPalette.DARK.forEdition(), DiPlayPalette.LIGHT.forEdition())) {
             assertContrastAtLeast(palette.primaryText, palette.background, 4.5)
+            assertContrastAtLeast(palette.primaryText, palette.railSelected, 4.5)
+            assertContrastAtLeast(palette.accent, palette.railSelected, 3.0)
             assertContrastAtLeast(palette.secondaryText, palette.background, 4.5)
             assertContrastAtLeast(palette.accent, palette.background, 4.5)
             assertContrastAtLeast(palette.onAccent, palette.accent, 4.5)

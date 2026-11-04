@@ -128,13 +128,13 @@ class AdaptiveSettingsUiTest {
         val palette = ReflectionHelpers.getField<DiPlayPalette>(screen, "palette")
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
 
-        assertSame(DiPlayPalette.LIGHT, palette)
-        assertEquals(DiPlayPalette.LIGHT.background, (scroll.background as ColorDrawable).color)
+        assertSame(DiPlayPalette.LIGHT.forEdition(), palette)
+        assertEquals(DiPlayPalette.LIGHT.forEdition().background, (scroll.background as ColorDrawable).color)
         assertEquals(
-            DiPlayPalette.LIGHT.background,
+            DiPlayPalette.LIGHT.forEdition().background,
             (screen.window.decorView.background as ColorDrawable).color,
         )
-        assertEquals(DiPlayPalette.LIGHT.systemBar, screen.window.navigationBarColor)
+        assertEquals(DiPlayPalette.LIGHT.forEdition().systemBar, screen.window.navigationBarColor)
     }
 
     @Test fun headerShortcutTogglesAppearanceAndReturnsFocusToItself() {
@@ -151,7 +151,7 @@ class AdaptiveSettingsUiTest {
         layoutRoot(screen)
 
         assertEquals(AppAppearance.LIGHT, AirPlayPersistence.loadAppAppearance(screen))
-        assertSame(DiPlayPalette.LIGHT, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertSame(DiPlayPalette.LIGHT.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
         val replacement = descendants(screen.window.decorView).single {
             it.contentDescription == screen.getString(R.string.settings_switch_to_dark_appearance)
         }
@@ -162,21 +162,21 @@ class AdaptiveSettingsUiTest {
         AirPlayPersistence.saveAppAppearance(context, AppAppearance.AUTO)
         AirPlayPersistence.saveCarPlayNightMode(context, CarPlayNightMode.DAY)
         val screen = openSettings()
-        assertSame(DiPlayPalette.LIGHT, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertSame(DiPlayPalette.LIGHT.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
 
         AirPlayPersistence.saveCarPlayNightMode(screen, CarPlayNightMode.NIGHT)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
 
-        assertSame(DiPlayPalette.DARK, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertSame(DiPlayPalette.DARK.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
-        assertEquals(DiPlayPalette.DARK.background, (scroll.background as ColorDrawable).color)
+        assertEquals(DiPlayPalette.DARK.forEdition().background, (scroll.background as ColorDrawable).color)
     }
 
     @Test fun hostAppearancePublishedOffMainRepaintsOnMain() {
         AirPlayPersistence.saveAppAppearance(context, AppAppearance.AUTO)
         AirPlayPersistence.saveCarPlayNightMode(context, CarPlayNightMode.DAY)
         val screen = openSettings()
-        assertSame(DiPlayPalette.LIGHT, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertSame(DiPlayPalette.LIGHT.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
         val owner = Any()
         val failure = AtomicReference<Throwable?>()
 
@@ -192,7 +192,7 @@ class AdaptiveSettingsUiTest {
 
         assertNull(failure.get())
         shadowOf(Looper.getMainLooper()).idle()
-        assertSame(DiPlayPalette.DARK, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertSame(DiPlayPalette.DARK.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
         AppAppearanceRuntime.clearHost(owner)
     }
 
@@ -247,8 +247,8 @@ class AdaptiveSettingsUiTest {
 
         assertTrue(dialog.isShowing)
         assertEquals("display", input.text.toString())
-        assertEquals(DiPlayPalette.LIGHT.accent, dialogAccent)
-        assertSame(DiPlayPalette.DARK, ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
+        assertEquals(DiPlayPalette.LIGHT.forEdition().accent, dialogAccent)
+        assertSame(DiPlayPalette.DARK.forEdition(), ReflectionHelpers.getField<DiPlayPalette>(screen, "palette"))
     }
 
     @Config(qualifiers = "en-w700dp-h400dp-land")
@@ -477,8 +477,12 @@ class AdaptiveSettingsUiTest {
         val button = descendants(screen.window.decorView).single {
             it.contentDescription == screen.getString(R.string.settings_search)
         }
-        assertTrue(button is android.widget.Button)
-        assertEquals(screen.getString(R.string.settings_search_hint), (button as TextView).text.toString())
+        if (com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR) {
+            assertTrue(button is android.widget.ImageButton)
+        } else {
+            assertTrue(button is android.widget.Button)
+            assertEquals(screen.getString(R.string.settings_search_hint), (button as TextView).text.toString())
+        }
         button.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(descendants(screen.window.decorView).any { it is EditText && it.hasFocus() })
@@ -512,6 +516,7 @@ class AdaptiveSettingsUiTest {
     @Test
     @Config(shadows = [HotspotSearchProbe::class])
     fun hotspotSearchIndexesItsAsyncCardWithoutStartingAnAdbProbe() {
+        org.junit.Assume.assumeFalse("BYD ADB card is excluded from Zeekr", com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR)
         installBydSettingsPackage()
         AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         HotspotSearchProbe.workers.clear()
@@ -640,7 +645,10 @@ class AdaptiveSettingsUiTest {
         assertTrue(buttons.size >= 4)
         buttons.forEach { button ->
             val lp = button.layoutParams as LinearLayout.LayoutParams
-            assertEquals(button.text.toString(), dp(60), lp.height)
+            if (com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR) {
+                assertEquals(button.text.toString(), ViewGroup.LayoutParams.WRAP_CONTENT, lp.height)
+                assertEquals(button.text.toString(), dp(60), button.minimumHeight)
+            } else assertEquals(button.text.toString(), dp(60), lp.height)
             assertEquals(button.text.toString(), 0, lp.topMargin)
             assertTrue(button.text.toString(), lp.bottomMargin in setOf(0, dp(6), dp(12)))
         }
@@ -772,8 +780,8 @@ class AdaptiveSettingsUiTest {
             .performClick()
 
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_advanced_caution_title) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.advanced_vehicle_data) })
+        assertEquals(!com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR, texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
+        assertTrue(texts(screen).any { it.text == screen.getString(if (com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR) R.string.settings_native_vehicle_title else R.string.advanced_vehicle_data) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.automatic_connection) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.display_and_performance) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.audio_routing) })
@@ -820,6 +828,8 @@ class AdaptiveSettingsUiTest {
             assertTrue(text(it), text(it) in advanced)
             assertFalse(text(it), text(it) in audio)
         }
+        assertEquals(com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR, text(R.string.settings_zeekr_interaction) in vehicle)
+        assertFalse(text(R.string.settings_zeekr_interaction) in advanced)
         assertTrue(text(R.string.right_hand_drive) in vehicle)
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)
         assertTrue(text(R.string.wheel_siri_key) in vehicle)
@@ -827,7 +837,7 @@ class AdaptiveSettingsUiTest {
         assertTrue(text(R.string.settings_navigation_wheel_volume) in advanced)
         assertFalse(text(R.string.settings_navigation_wheel_volume) in audio)
         assertFalse(text(R.string.settings_navigation_wheel_volume) in vehicle)
-        assertTrue(text(R.string.settings_ambient_title) in advanced)
+        assertEquals(!com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR, text(R.string.settings_ambient_title) in advanced)
         assertFalse(text(R.string.settings_ambient_title) in audio)
         assertFalse(text(R.string.settings_ambient_title) in vehicle)
         assertFalse(text(R.string.settings_ambient_title) in display)
@@ -1148,7 +1158,9 @@ class AdaptiveSettingsUiTest {
             val destination = descendants(screen.window.decorView).single {
                 it.contentDescription == screen.getString(R.string.settings_open_category, title)
             }
-            assertEquals(1, descendants(destination).filterIsInstance<ImageView>().count())
+            // Zeekr's category row includes its category icon and a decorative destination chevron.
+            assertEquals(if (com.shilapi.xcertplay.host.BuildConfig.IS_ZEEKR) 2 else 1,
+                descendants(destination).filterIsInstance<ImageView>().count())
         }
     }
 

@@ -60,9 +60,11 @@ object SettingsBackupCodec {
     private val PICTURE_KEYS = CarPlayPicture.keys.toSet()
     // The driver's choices only. "ignore_off_report" records what one car's firmware reports, so it stays out.
     private val CAR_HOTSPOT_KEYS = setOf("auto_enable", "config_write")
+    private val ZEEKR_INTERACTION_KEYS = setOf("media_enabled", "auto_select", "controls_enabled")
     private val FILES = mapOf(
         "xcertplay_airplay" to Policy.Allow(AIRPLAY_KEYS, AIRPLAY_PREFIXES),
         "diplay" to Policy.Allow(DIPLAY_KEYS),
+        "zeekr_interaction" to Policy.Allow(ZEEKR_INTERACTION_KEYS, types = ZEEKR_INTERACTION_KEYS.associateWith { KeyType.BOOLEAN }),
         // These readers call getInt and getBoolean, which throw on any other stored type. A key that is not stored yet
         // has no type to compare with, so the type is declared here.
         "carplay_picture" to Policy.Allow(PICTURE_KEYS, types = PICTURE_KEYS.associateWith { KeyType.INT }),

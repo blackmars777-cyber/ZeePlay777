@@ -50,6 +50,9 @@ android {
             versionNameSuffix = editionConfig.getValue("debugVersionNameSuffix")
         }
         release {
+            // The mobile edition overlay links to the original icon, bypassing library PNG crunching.
+            // Keep supplied ZeePlay artwork bytes and transparent RGB values intact.
+            if (edition == "zeekr") isCrunchPngs = false
             applicationIdSuffix = editionConfig.getValue("releaseApplicationIdSuffix")
             optimization {
                 enable = false
@@ -67,6 +70,8 @@ android {
     }
     if (edition == "zeekr") {
         sourceSets.getByName("release").manifest.srcFile("src/zeekr/AndroidManifest.xml")
+        sourceSets.getByName("debug").res.srcDir("src/zeekr/res")
+        sourceSets.getByName("release").res.srcDir("src/zeekr/res")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

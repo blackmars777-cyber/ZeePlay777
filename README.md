@@ -1,67 +1,57 @@
-# DiPlay
+# CarPlay · Zeekr OS 7.2.5 edition
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)
 
-**CarPlay for compatible BYD Android head units.** Wired and wireless, with the familiar DiAuto interface. Independent app: `com.shihab.diplay`.
+**A CarPlay app customized for Zeekr OS 7.2.5 head units**, with wired and wireless connection, a Zeekr-style interface, and integration with the vehicle media center, hotspot and supported vehicle-data services.
 
-> **BYD support scope:** These projects focus on BYD cars. They may work on other brands, but other brands are unsupported and there are no plans to add support or fix brand-specific incompatibilities.
+Forked from [DiPlay](https://github.com/shihabal3amri/DiPlay).
 
-[Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.22) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
+## What this fork changes
 
-![DiPlay home](site/assets/home.png)
+| Area | Zeekr customization |
+| --- | --- |
+| Interface | Light and dark themes, restrained blue accents, line icons and grouped settings inspired by the Zeekr OS 7 design language; adaptive landscape, split-screen and large-text layouts. |
+| Settings | Zeekr-focused pages, search and onboarding; BYD / DiLink configuration is hidden. |
+| Media center | CarPlay song information, artwork and progress; playback commands from supported vehicle controls; configurable automatic CarPlay source selection. |
+| Car hotspot | Prefer the detected OEM hotspot service, reusing the saved car configuration. That service path does not require ADB. |
+| Vehicle data | Read measured battery percentage, dynamic range, speed and gear through the supported CarSensor profile; optional reporting to iPhone. |
+| Configuration | Separate controls for media integration, source selection and playback commands; changes that require a new session show a reconnect prompt. |
 
-## 0.2.22 — public preview
+## Zeekr OS 7.2.5 adaptation
 
-Install on the **car**, not the iPhone. No jailbreak, dongle, Mac, account or authentication server is required for use. Core CarPlay does not require ADB; optional dashboard, battery, wheel-speed and parked-video features do. Your head unit must permit APK installation. The APK supports Android 7.0+ (API 24); on Android 7.0–8.1, wired CarPlay is confirmed on one car and wireless is not yet confirmed on a vehicle. Wireless supports Wi-Fi Direct, the car’s existing hotspot or Existing Wi-Fi / Same LAN. Android 7.0–9 Wi-Fi Direct uses a firmware-dependent legacy path with generated group credentials and unverified requested frequency; see [Android 9 Wi-Fi Direct](docs/ANDROID9_WIFI_DIRECT.md). Android 10+ verifies its negotiated group frequency.
+**Zeekr OS 7.2.5 is the target system for this fork.** The app uses the actual available window and system insets; it does not draw a replica system status bar, climate dock or vehicle controls, and does not restyle the projected CarPlay content.
 
-- Wired USB and wireless CarPlay with local authentication.
-- BYD HUD navigation with arrows, distance and street names on verified firmware.
-- Car hotspot support, improved audio buffering and saved receive diagnostics.
-- Automatic address discovery, fixed-channel Wi-Fi fallbacks and successful-configuration memory.
-- Icon/text size, resolution and frame rate; applying a display change reconnects CarPlay.
-- Local diagnostic export. Reports are sent only if you choose to share them.
-- Separate installation alongside DiAuto. Run one projection app at a time.
+The OS version alone does not establish compatibility with every model or firmware. Media, hotspot and vehicle-data integration depend on the services and permissions available on the car. Vehicle-data decoding remains restricted to the explicitly matched model/firmware profile; missing or unverified readings are not fabricated. See the [vehicle-data scope](docs/ZEEKR-VEHICLE-DATA.zh-CN.md).
 
-This is **not an Apple-certified product**. The APK bundles an experimental accessory identity recovered from public Carlinkit firmware, not a newly provisioned MFi identity for DiPlay. A bundled private key is extractable. Acceptance after future iOS updates, reliability across head units and suitability of that identity for general distribution are unresolved. This release invites community testing; it is not a guarantee of universal compatibility.
+## Getting started
 
-Earlier releases were tested on the development DiLink5.1 car: live windshield guidance and street names work, Car hotspot now starts CarPlay, and Wi-Fi Direct performance is substantially improved. Audio underrun recovery is improved in 0.2.15; remaining cutouts need current diagnostic reports. The 0.2.16 software Opus microphone fallback was accepted on a BOS Mini A1 head unit (Android 9) with an iPhone 12 on iOS 27. The floating-map test build was installed on the development DiLink 5.1 car; feedback led to the pinch corrections in 0.2.9. Earlier wheel-speed and video contributions were tested on a BYD Tang with DiLink 5.0 and an iPhone 15 Pro on iOS 27; wheel-speed dead reckoning in tunnels remains unverified. Broader head-unit and iOS compatibility is not guaranteed. The HUD firmware scope and cleanup limits are documented in [BYD navigation](docs/BYD_NAVIGATION.md).
+1. Install the **Zeekr edition on the head unit**, not on the iPhone. The package is `com.shihab.diplay.hudtest`.
+2. Choose USB, the car hotspot, Wi-Fi Direct or an existing Wi-Fi network, then complete pairing and the requested permissions.
+3. Open **Settings → Vehicle → Vehicle integration** to configure the media center, automatic source selection and playback controls.
+4. Enable optional battery/range and speed reporting under **Advanced** only when the vehicle data is readable. Speed reporting also requires location sharing.
 
-## What’s new in 0.2.22
+Use a matching signing certificate when updating an existing installation to preserve its settings and pairing data. The standalone vehicle-data probe is a separate app.
 
-- Wireless CarPlay over the car hotspot connects again on BYD DiLink 3.0 and 4.0 head units where 0.2.21 stayed on "Opening CarPlay"; the **Hotspot interface (optional)** workaround can be cleared.
-- Music plays at the iPhone's speed over Wi-Fi again, from the first second of every song, without the 0.2.21 speed-up and stutter.
-- Over USB, WeChat voice messages, Voice Memos and dictation record your voice instead of silence.
-- Wired CarPlay connects on the first attempt after a replug, and the CarPlay screen and Home say why a connection failed and what to change.
-- DiPlay is available in Korean and Turkish.
-- New options, off by default: keep CarPlay in the launcher card, navigation prompts that ask for audio focus, calls at the call's own rate, a full-screen DiLink 3.0 dashboard map and the dashboard map on the Denza N9.
+## Build the Zeekr edition
 
-See [0.2.22 release notes](docs/RELEASE-NOTES-0.2.22.md) and [validation](docs/VALIDATION.md) for contribution links and remaining physical tests. General stutter, calls/Siri, decoder and model-specific reports still need current-device evidence. [0.2.21 notes](docs/RELEASE-NOTES-0.2.21.md) remain available as historical guidance.
+```sh
+./gradlew -Pdiplay.edition=zeekr :mobile:assembleDebug
+```
 
-If a problem remains, reproduce it on **0.2.22**, then use **Settings → Diagnostics → Save diagnostic report**. Android 10+ normally saves to **Downloads/DiPlay**; Android 7.0–9 asks for storage access and saves there too. If unavailable, use **View report** or **Share** from the confirmation, which identifies external/private fallback storage. Review the `.txt` and attach it as a file to a matching [existing issue](https://github.com/shihabal3amri/DiPlay/issues), or [create one](https://github.com/shihabal3amri/DiPlay/issues/new/choose). Include vehicle/head-unit model, exact firmware and Android/DiLink, phone/iOS, connection backend, relevant settings, steps and failure time. Reports are shared only when you choose; never post your hotspot password.
+Output: `mobile/build/outputs/apk/debug/mobile-debug.apk`.
 
-## Documentation
+Ordinary source/CI builds omit CarPlay authentication assets. For a complete local build, provide the external runtime assets as described in the [Zeekr build guide](docs/ZEEKR-BUILD.md); do not put credentials or signing keys in the repository.
 
-[Existing Wi-Fi / Same LAN](docs/EXISTING_WIFI.md) keeps the iPhone and head unit
-on an external router. See the guide for setup, build requirements and the
-BYD DiLink 4.0 / Android 10 clean-install validation result.
+## Documentation and feedback
 
-- [Install and connect](docs/INSTALL.md)
-- [Compatibility and troubleshooting](docs/COMPATIBILITY.md)
-- [Smooth wireless CarPlay](docs/SMOOTH_WIRELESS.md)
-- [Privacy and diagnostic reports](docs/PRIVACY.md)
-- [Build from source](docs/BUILD.md) — select `mobile` for the main DiPlay app; `maphost` is a map sample.
-- [Validation](docs/VALIDATION.md)
-- [Release notes](CHANGELOG.md)
-- [Credits and licenses](docs/THIRD_PARTY_NOTICES.md)
+- [Zeekr builds and packaging](docs/ZEEKR-BUILD.md)
+- [Media-center integration](docs/ZEEKR-MEDIA-SOURCE.md)
+- [OEM hotspot service](docs/ZEEKR-HOTSPOT.md)
+- [Vehicle data and acceptance](docs/ZEEKR-VEHICLE-DATA.zh-CN.md)
+- [Interface and component specification](docs/design/ZEEKR-OS72-HMI.md)
 
-The app and the website include English, Arabic, Russian, Ukrainian, Spanish, Simplified Chinese, Traditional Chinese (Taiwan), Japanese, Italian, Korean and Turkish. Traditional Chinese uses Taiwan wording; the app also recognizes Hong Kong/Macao and explicit Hant selections without claiming separate regional translations. Choose the app language in Settings; on Android 13+, it stays synchronized with Android’s per-app language setting. See the [Traditional Chinese guide](README.zh-TW.md) for installation, settings, troubleshooting, privacy and build instructions.
+For a connection or integration issue, export a report from **Settings → Diagnostics** and include the vehicle model, full OS/firmware version, iPhone/iOS version, connection mode, reproduction steps and failure time. Review the report before sharing it.
 
-## Source and credits
+## Source and licenses
 
-Based on [xcertplay](https://github.com/shilapi/xcertplay), GPL-3.0. The home/settings UI and website adapt [DiAuto](https://github.com/shihabal3amri/DiAuto), AGPL-3.0; that license is included in `docs/licenses`. Preserve those notices when distributing modifications. CarPlay and its icon belong to Apple Inc.; no Apple or BYD affiliation or endorsement is implied.
-
-This repository starts with a clean public source snapshot. Local research, tester reports and release-signing secrets are excluded. The complete source corresponding to the APK is provided with every release; experimental runtime identity assets are described separately in the build instructions and notices.
-
-## Local release packaging
-
-The release APK intentionally contains the experimental accessory identity. The Git repository and source archive exclude all accessory and Android signing keys; tests generate synthetic identities at runtime. Source/CI builds omit runtime identity assets by default. Local release builds explicitly select an external asset directory. Publishing the APK makes its bundled identity extractable; building locally does not preserve that identity's confidentiality.
+This fork retains DiPlay's existing open-source license and attribution notices. See [LICENSE](LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md). This is an independent fork, with no official affiliation with Zeekr or Apple.

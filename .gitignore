@@ -42,3 +42,20 @@ release-signing.properties
 
 # Written by scripts/download_count.py when the site is deployed
 site/assets/downloads.json
+
+# Local vehicle backups and reverse-engineering output
+zeekrbackup-*/
+decompiled/
+jadx-output/
+apktool-output/
+*.apks
+*.xapk
+*.dex
+*.smali
+*.odex
+*.vdex
+*.oat
+
+# Python tooling caches
+__pycache__/
+*.py[cod]

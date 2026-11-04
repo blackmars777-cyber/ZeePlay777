@@ -16,7 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Reject credential files in public source
-        run: python3 scripts/check_public_tree.py
+        run: |
+          python3 scripts/check_public_tree.py
+          python3 -m unittest discover -s scripts/tests -p 'test_public_tree.py'
+          python3 scripts/sync_zeekr_branding.py --check
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -48,6 +51,9 @@ jobs:
             common/build/reports/album-artwork-ui/
             common/build/reports/navigation-focus-ui/
             common/build/reports/zeekr-vehicle-ui/
+            common/build/reports/zeekr-settings-ui/
+            common/build/reports/zeekr-hmi-states/
+            common/build/reports/zeekr-auxiliary-ui/
             mobile/build/reports/lint-results-debug.html
             samples/home/build/reports/tests/
             samples/home/build/reports/lint-results-debug.html

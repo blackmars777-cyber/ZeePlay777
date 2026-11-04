@@ -36,10 +36,46 @@ import org.robolectric.shadows.ShadowContentResolver
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], shadows = [FileProviderPathTestShadow::class])
 class ZeekrMediaSourceTest {
+    @org.junit.After fun resetInteractionPreferences() {
+        RuntimeEnvironment.getApplication().getSharedPreferences("zeekr_interaction", 0).edit().clear().commit()
+    }
+
+    @Test fun disabledMediaIntegrationDoesNotBindTheVehicleService() {
+        val car = FakeCar()
+        ZeekrInteractionSettings.setMediaEnabled(car.context, false)
+        assertNull(createVehicleMediaSource(car.context, Handler(Looper.getMainLooper()), { true }, { true }))
+        idle()
+        assertEquals(0, car.binds)
+    }
+
+    @Test fun automaticSourceSelectionCanBeDisabledWithoutLosingMetadata() {
+        val car = FakeCar()
+        ZeekrInteractionSettings.setAutoSelect(car.context, false)
+        val source = ZeekrMediaSource(car.context, { true }, Handler(Looper.getMainLooper()))
+        try {
+            source.start()
+            source.update(CarPlayNowPlaying(title = "Phone song", playing = true), null)
+            idle()
+            assertEquals("Phone song", car.title)
+            assertEquals(0, car.claims)
+        } finally { source.close(); idle() }
+    }
+
+    @Test fun disabledVehicleControlsDoNotForwardPlaybackCommands() {
+        val car = FakeCar()
+        ZeekrInteractionSettings.setControlsEnabled(car.context, false)
+        val source = ZeekrMediaSource(car.context, { fail("disabled vehicle controls forwarded a command"); false }, Handler(Looper.getMainLooper()))
+        try {
+            source.start()
+            idle()
+            assertFalse(source.select(6, 0))
+        } finally { source.close(); idle() }
+    }
+
     @Test fun editionFactoryCannotStartOrSendAfterItsControllerIsReleased() {
         val car = FakeCar()
-        val source = createVehicleMediaSource(car.context, Handler(Looper.getMainLooper()),
-            current = { false }, send = { fail("released controller received a media command"); false })
+        val source = requireNotNull(createVehicleMediaSource(car.context, Handler(Looper.getMainLooper()),
+            current = { false }, send = { fail("released controller received a media command"); false }))
         source.deactivate()
         idle()
         assertEquals(0, car.binds)

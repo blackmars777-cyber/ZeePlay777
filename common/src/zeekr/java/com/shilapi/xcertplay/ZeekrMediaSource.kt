@@ -62,6 +62,8 @@ internal class ZeekrMediaSource(
     private var coverUri: Uri? = null
     private val covers = ArrayDeque<Uri>()
     private val coverFiles = ArrayDeque<File>()
+    private val autoSelect = ZeekrInteractionSettings.autoSelect(context)
+    private val controlsEnabled = ZeekrInteractionSettings.controlsEnabled(context)
     private var yielded = false
     private val folder = File(context.cacheDir, "zeekr-artwork/${UUID.randomUUID()}")
     private val progressTick = object : Runnable {
@@ -421,7 +423,7 @@ internal class ZeekrMediaSource(
     }
 
     private fun control(generation: Int, command: Int): Boolean {
-        if (!valid(generation)) return false
+        if (!valid(generation) || !controlsEnabled) return false
         val owner = registrationOwner
         val sent = send(command)
         if (sent && command == CarPlayMediaButton.PLAY) worker.post {
@@ -459,7 +461,7 @@ internal class ZeekrMediaSource(
         if (closed || token == null || media == null) return
         val next = snapshot
         if (previous?.info?.playing == false && next.info.playing) yielded = false
-        if (!yielded && next.info.playing && previous?.info?.playing != true) claimSource()
+        if (autoSelect && !yielded && next.info.playing && previous?.info?.playing != true) claimSource()
         if (next.artwork !== cover) {
             cover = next.artwork
             var pendingFile: File? = null
